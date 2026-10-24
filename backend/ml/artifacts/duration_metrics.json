@@ -1,0 +1,45 @@
+{
+  "cv": {
+    "minor_events": {
+      "n": 134,
+      "coverage_p10_p90": 0.41044776119402987,
+      "pinball_q10": 4.81044776119403,
+      "pinball_q50": 23.658588645212216,
+      "pinball_q90": 33.66268656716419,
+      "baseline_pinball_q10": 4.81044776119403,
+      "baseline_pinball_q50": 23.66417910447761,
+      "baseline_pinball_q90": 31.419402985074626
+    },
+    "storm_2024-09": {
+      "n": 194,
+      "coverage_p10_p90": 0.3402061855670103,
+      "pinball_q10": 1.9123711340206189,
+      "pinball_q50": 9.177120383450342,
+      "pinball_q90": 10.293814432989691,
+      "baseline_pinball_q10": 1.9123711340206189,
+      "baseline_pinball_q50": 9.1340206185567,
+      "baseline_pinball_q90": 13.41237113402062
+    },
+    "storm_2025-01": {
+      "n": 46,
+      "coverage_p10_p90": 0.7391304347826086,
+      "pinball_q10": 1.7434782608695647,
+      "pinball_q50": 8.277607429900147,
+      "pinball_q90": 4.841304347826088,
+      "baseline_pinball_q10": 1.7434782608695647,
+      "baseline_pinball_q50": 8.282608695652174,
+      "baseline_pinball_q90": 2.382608695652174
+    },
+    "storm_2025-02": {
+      "n": 1209,
+      "coverage_p10_p90": 0.5252274607113316,
+      "pinball_q10": 0.6564929693961953,
+      "pinball_q50": 11.145434400122399,
+      "pinball_q90": 6.4470636889991715,
+      "baseline_pinball_q10": 0.4305210918114144,
+      "baseline_pinball_q50": 11.06989247311828,
+      "baseline_pinball_q90": 6.794706368899915
+    }
+  },
+  "n_records": 1583
+}

@@ -26,5 +26,18 @@ services:
       db:
         condition: service_healthy
 
+  # Train + score: docker compose run --rm ml
+  ml:
+    build: ./backend
+    profiles: ["ml"]
+    environment:
+      DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER:-outage}:${POSTGRES_PASSWORD:-outage}@db:5432/${POSTGRES_DB:-outage}
+    volumes:
+      - ./backend:/app  # artifacts written back to backend/ml/artifacts
+    depends_on:
+      db:
+        condition: service_healthy
+    command: sh -c "python -m ml.build_dataset && python -m ml.train && python -m ml.duration && python -m ml.score_assets"
+
 volumes:
   pgdata:

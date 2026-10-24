@@ -1,0 +1,24 @@
+{
+  "assets": 333010,
+  "storms": 35,
+  "asset_storm_pairs": 11655350,
+  "positives": 1563,
+  "population_positive_rate": 0.00013410150703325083,
+  "training_rows": 158447,
+  "neg_rate_major": 0.05,
+  "neg_rate_minor": 0.01,
+  "severity_levels": {
+    "low": {
+      "n_records": 12.0,
+      "reference": "a typical minor event (8 past events with 10-39 damage reports)"
+    },
+    "medium": {
+      "n_records": 194.0,
+      "reference": "the September 2024 storm (194 damage reports)"
+    },
+    "high": {
+      "n_records": 1254.0,
+      "reference": "the February 2025 storm (1254 damage reports)"
+    }
+  }
+}

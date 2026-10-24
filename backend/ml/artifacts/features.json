@@ -1,0 +1,72 @@
+{
+  "model_version": "outage-risk-v1",
+  "model_name": "logistic_regression",
+  "numeric": [
+    "age_years",
+    "height_ft",
+    "pole_class_num",
+    "voltage_kv",
+    "segment_len_m",
+    "kva",
+    "fuse_size_a",
+    "overhead",
+    "bare_conductor",
+    "customers_downstream",
+    "n_upline_devices",
+    "n_upline_reclosers",
+    "hist_asset_damaged",
+    "hist_circuit_share",
+    "hist_share_250m",
+    "hist_share_500m",
+    "hist_access_rate_500m",
+    "storm_log_damage"
+  ],
+  "categorical": [
+    "asset_type",
+    "material",
+    "line_usage",
+    "wire_spec_top",
+    "device_subtype",
+    "owner_type"
+  ],
+  "severity_levels": {
+    "low": {
+      "n_records": 12.0,
+      "reference": "a typical minor event (8 past events with 10-39 damage reports)"
+    },
+    "medium": {
+      "n_records": 194.0,
+      "reference": "the September 2024 storm (194 damage reports)"
+    },
+    "high": {
+      "n_records": 1254.0,
+      "reference": "the February 2025 storm (1254 damage reports)"
+    }
+  },
+  "shap_importance": {
+    "storm_log_damage": 2.3513,
+    "voltage_kv": 1.2708,
+    "device_subtype": 0.7955,
+    "height_ft": 0.7628,
+    "overhead": 0.7594,
+    "pole_class_num": 0.7477,
+    "material": 0.6186,
+    "line_usage": 0.6147,
+    "bare_conductor": 0.6112,
+    "asset_type": 0.5669,
+    "wire_spec_top": 0.5446,
+    "segment_len_m": 0.3557,
+    "age_years": 0.1733,
+    "hist_circuit_share": 0.0627,
+    "n_upline_reclosers": 0.0598,
+    "customers_downstream": 0.0566,
+    "n_upline_devices": 0.0518,
+    "kva": 0.0287,
+    "owner_type": 0.0221,
+    "hist_access_rate_500m": 0.0199,
+    "hist_share_500m": 0.0118,
+    "hist_asset_damaged": 0.009,
+    "fuse_size_a": 0.0064,
+    "hist_share_250m": 0.0042
+  }
+}

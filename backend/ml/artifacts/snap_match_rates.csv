@@ -1,0 +1,9 @@
+arcos_asset_type,records,matched,match_rate,max_distance_m
+Pole,355,354,0.9972,30.0
+primary,704,700,0.9943,30.0
+secondary,156,156,1.0,30.0
+Fuse Bank,280,278,0.9929,30.0
+Transformer,74,73,0.9865,30.0
+Recloser Bank,58,56,0.9655,30.0
+Switch,19,16,0.8421,30.0
+"(not modeled: Capacitor Bank, Light, Step Transformer, blank)",13,0,0.0,
