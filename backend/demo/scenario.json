@@ -1,0 +1,43 @@
+{
+  "storm_name": "Demo storm (modeled on the February 2025 storm)",
+  "premise": "982542862",
+  "address_query": "7110 Rabbit Run, Roanoke",
+  "demo_declared_needs": ["medical_device"],
+  "timeline": [
+    {
+      "step": "pre_storm",
+      "hours_since_outage": null,
+      "confirmed": {"storm_forecast": true, "outage": false},
+      "scenario": {"storm_severity": "high", "crews": 4, "crew_arrival_delay_hrs": 0},
+      "proactive_message": "pre_storm"
+    },
+    {
+      "step": "outage",
+      "hours_since_outage": 0,
+      "confirmed": {"storm_forecast": true, "outage": true},
+      "scenario": {"storm_severity": "high", "crews": 4, "crew_arrival_delay_hrs": 6},
+      "proactive_message": "outage_confirmed"
+    },
+    {
+      "step": "damage_assessed",
+      "hours_since_outage": 8,
+      "confirmed": {"storm_forecast": true, "outage": true, "damage": {"Pole": 1, "wire": 2}},
+      "scenario": {"storm_severity": "high", "crews": 4, "crew_arrival_delay_hrs": 2},
+      "proactive_message": "estimate_updated"
+    },
+    {
+      "step": "crews_working",
+      "hours_since_outage": 14,
+      "confirmed": {"storm_forecast": true, "outage": true, "damage": {"Pole": 1, "wire": 2}, "crews_on_site": true},
+      "scenario": {"storm_severity": "high", "crews": 4, "crew_arrival_delay_hrs": 0},
+      "proactive_message": "estimate_updated"
+    },
+    {
+      "step": "restored",
+      "hours_since_outage": 30,
+      "confirmed": {"storm_forecast": false, "outage": false, "restored": true},
+      "scenario": {"storm_severity": "high", "crews": 4, "crew_arrival_delay_hrs": 0},
+      "proactive_message": "restored"
+    }
+  ]
+}

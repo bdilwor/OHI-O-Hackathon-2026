@@ -9,7 +9,6 @@ from sqlalchemy.exc import OperationalError
 
 from ml.db import get_engine
 
-KNOWN_PREMISE = "551102222"
 SAMPLE_PREMISES = 200
 
 
@@ -54,3 +53,26 @@ def sample_premises(engine):
         return conn.execute(text(
             "SELECT premise_nu FROM customers WHERE premise_nu IS NOT NULL "
             "ORDER BY md5(premise_nu) LIMIT :n"), {"n": SAMPLE_PREMISES}).scalars().all()
+
+
+
+@pytest.fixture(scope="session")
+def client(scored_db, tmp_path_factory):
+    """FastAPI app in-process, offline LLM mode, audit log in a temp dir."""
+    import os
+
+    os.environ["LLM_PROVIDER"] = "offline"
+    os.environ["AUDIT_LOG_PATH"] = str(tmp_path_factory.mktemp("audit") / "audit.jsonl")
+    from fastapi.testclient import TestClient
+
+    import main
+
+    with TestClient(main.app) as c:
+        yield c
+
+
+@pytest.fixture
+def fresh_storm(client):
+    client.post("/storm/reset")
+    yield
+    client.post("/storm/reset")

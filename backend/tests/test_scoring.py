@@ -7,7 +7,7 @@ from sqlalchemy import text
 
 from ml.score import risk_band
 
-from .conftest import KNOWN_PREMISE
+from .constants import KNOWN_PREMISE
 
 REQUIRED_KEYS = {"premise", "severity", "risk_band", "probability", "confidence", "confidence_reason",
                  "top_factors", "assumptions", "source", "model_version", "fallback"}

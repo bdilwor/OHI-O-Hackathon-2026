@@ -1,14 +1,18 @@
 """Score every asset with the trained model and publish the `asset_risk` table.
 
-    python -m ml.score_assets
+    python -m ml.score_assets               # (re)publish
+    python -m ml.score_assets --if-missing  # only when the table doesn't exist yet (container startup)
 
 History features use *all* ARCOS storms to date; ages are as of today. One row per asset
 with P(damage) at each severity scenario plus its top-3 risk-raising factors (SHAP).
 Runs from the committed model.joblib, so no retraining is needed for a fresh database.
 """
+import io
+import sys
+
 import numpy as np
 import pandas as pd
-from sqlalchemy import text
+from sqlalchemy import inspect, text
 
 from . import features as F
 from .db import ARTIFACTS, get_engine
@@ -22,8 +26,11 @@ NON_LOCAL_FEATURES = {"storm_log_damage"}
 
 
 def main() -> None:
-    bundle = load_bundle()
     engine = get_engine()
+    if "--if-missing" in sys.argv and inspect(engine).has_table(TABLE):
+        print(f"{TABLE} already published; skipping.")
+        return
+    bundle = load_bundle()
     assets_path, arcos_path = ARTIFACTS / "assets.parquet", ARTIFACTS / "arcos.parquet"
     if assets_path.exists() and arcos_path.exists():
         assets, arcos = pd.read_parquet(assets_path), pd.read_parquet(arcos_path)
@@ -62,10 +69,12 @@ def main() -> None:
         feat = np.where(vals[:, k] > 0, names[order[:, k]], None)
         out[f"factor_{k + 1}"] = feat
         # The asset's own value for that factor, so explanations can quote it.
-        out[f"factor_{k + 1}_value"] = [
-            None if f is None or pd.isna(rows.iat[i, rows.columns.get_loc(f)]) else str(rows.iat[i, rows.columns.get_loc(f)])
-            for i, f in enumerate(feat)
-        ]
+        values = np.full(len(feat), None, dtype=object)
+        for f in pd.unique(feat[feat != None]):  # noqa: E711 (elementwise)
+            mask = feat == f
+            col = rows[f].to_numpy()[mask]
+            values[mask] = [None if pd.isna(v) else str(v) for v in col]
+        out[f"factor_{k + 1}_value"] = values
 
     # Raw values the plain-English explanations quote.
     for col in ["age_years", "material", "overhead", "hist_asset_damaged"]:
@@ -73,7 +82,17 @@ def main() -> None:
 
     with engine.begin() as conn:
         conn.execute(text(f"DROP TABLE IF EXISTS {TABLE}"))
-    out.to_sql(TABLE, engine, index=False, chunksize=20_000)
+    out.head(0).to_sql(TABLE, engine, index=False)  # schema only; bulk rows via COPY (much faster)
+    buf = io.StringIO()
+    out.to_csv(buf, index=False, header=False)
+    buf.seek(0)
+    raw = engine.raw_connection()
+    try:
+        with raw.cursor() as cur:
+            cur.copy_expert(f"COPY {TABLE} FROM STDIN WITH (FORMAT csv)", buf)
+        raw.commit()
+    finally:
+        raw.close()
     with engine.begin() as conn:
         conn.execute(text(f"CREATE INDEX ix_{TABLE}_location_n ON {TABLE} (location_n)"))
         conn.execute(text(f"CREATE INDEX ix_{TABLE}_circuit_key ON {TABLE} (circuit_key)"))

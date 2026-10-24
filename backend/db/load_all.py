@@ -3,6 +3,7 @@
 Idempotent: every table is dropped and recreated on each run.
     python -m db.load_all
 """
+import os
 import sys
 import time
 
@@ -106,9 +107,19 @@ def verify(engine: Engine) -> list[str]:
     return errors
 
 
+def already_loaded(engine: Engine) -> bool:
+    try:
+        return not verify(engine)
+    except Exception:  # missing tables
+        return False
+
+
 def main() -> int:
     engine = create_engine(DATABASE_URL)
     wait_for_db(engine)
+    if os.environ.get("FORCE_RELOAD") != "1" and already_loaded(engine):
+        print("Database already loaded with the expected row counts; skipping (set FORCE_RELOAD=1 to reload).")
+        return 0
     with engine.begin() as conn:
         conn.execute(text("CREATE EXTENSION IF NOT EXISTS postgis"))
 

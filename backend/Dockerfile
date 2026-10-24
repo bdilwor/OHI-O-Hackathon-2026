@@ -15,8 +15,6 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY db/ db/
-COPY ml/ ml/
-COPY tests/ tests/
+COPY . .
 
 CMD ["python", "-m", "db.load_all"]

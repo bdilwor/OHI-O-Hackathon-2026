@@ -106,3 +106,72 @@ All assumptions behind the outage-risk estimate (`ml/score.py`) and the repair-d
 - Live outage or damage reports during a storm: the estimate is pre-storm, not live.
 - Crew counts, mutual aid, road access: these affect restoration time, not damage risk.
 - Vegetation management, recent hardening or rebuilds: not in the GIS extract.
+
+---
+
+# Restoration-time estimate (`backend/restoration.py`)
+
+No ETA model is trained, because ARCOS dates are day-level. Restoration time is built from labor hours.
+
+## Labor data
+- **Source:** STORMS labor hours per compatible-unit (CU) group from `Install_Labor_HackOHIO.xlsx`, loaded as the `labor_cu_group_avg` table.
+- **Indirect labor multiplier:** **4.5**, from the same workbook. It is applied to all labor hours to cover travel, safety briefings and setup.
+- **What a repair job contains** comes from AEP distribution-standard drawings (`data/structure_drawings.pdf`). Each labeled assembly maps to a STORMS CU group:
+
+| Drawing assembly (D.S.) | STORMS CU group |
+|---|---|
+| Pin & insulator (30) | Pin + Insulator |
+| Crossarm (20 / 26) | Crossarm |
+| Primary dead-end (31), neutral dead-end (501) | Dead-End |
+| Neutral assembly (500), twisted secondary (502), risers (1002) | Secondary Conductor Attachment |
+| Guying assembly (400) | Guying + Anchor |
+| Grounding assembly (65) | Grounding |
+| Connector / hot-line tap (70, 74, 75-A) | Connector |
+| Cutout + fuse link (61, 1001) | Fuse Cutout |
+| Brackets (32-x, 51/52) | Bracket |
+| #4 Cu lead (75-A) | Equipment Lead |
+| Transformer (1000) | Transformer (by kVA) |
+
+Wire ties (D.S. 40) and arresters (D.S. 62) have no STORMS CU; arresters are counted through their bracket and lead.
+
+## Repair bundles
+Replaced parts count removal + install hours; new connectors count install only.
+
+| Damage | Bundle | Crew-hours incl. ×4.5 (mean) |
+|---|---|---|
+| Pole | Pole sized from GIS height, plus re-framing sampled from the drawings: single-phase tangent, p.5 (50%); three-phase crossarm tangent, p.9 (30%); three-phase dead-end, p.3/p.8 (20%) | ~22 |
+| Primary wire | Per phase: 2 connectors + 1 insulator, plus a neutral connector. Single-phase (70%) or three-phase (30%) | ~4.7 |
+| Secondary wire | 2 secondary attachments + 2 connectors (D.S. 502) | ~5.2 |
+| Service drop | Service CU | ~9.8 |
+| Fuse | Cutout + bracket + hot-line-tap connector + lead | ~10.5 |
+| Transformer | Transformer (kVA from GIS) + cutout + 2 brackets + 2 leads + 2 connectors + riser + grounding (p.2) | ~33 |
+| Recloser / switch | No drawing. Assumed device + 3/2 leads + 3/2 connectors + bracket + grounding | ~26 / ~29 |
+
+- The **structure mix** (50/30/20) and the **phase mix** (70/30) are assumptions: the GIS has no framing or phase-count field.
+- **Wire jobs are a lower bound.** STORMS has no conductor-stringing CU, so a long wire-down repair can take longer than estimated.
+
+## Simulation
+- **Damage:**
+  - The premise's exposure set plus every other asset on its circuit is sampled as Bernoulli(p) from `asset_risk` at the scenario severity.
+  - **Conditional on the premise being out:** a run with no damage on the premise's path gets one path asset damaged, drawn in proportion to p.
+  - Once damage is *assessed* (storm timeline), confirmed damage replaces the sampled damage on the premise's path.
+  - What-if `extra_damage` adds jobs on the premise's path.
+- **Job hours:** lognormal around the bundle mean (σ = 0.35, mean-preserving).
+- **Blocked access** adds the Access Constraint (0.5 h) and Remote Location (1.312 h) adders × ILM to each path job. It also applies the ARCOS repair-history multiplier from `ml.duration`, but that is 1.0 in practice: historical median repair time doesn't change with access issues alone.
+- **Upstream-first sequencing:** tiers are (1) reclosers, switches and backbone, (2) fuses, laterals and poles, (3) transformers, secondary and service. The premise waits for:
+  - all circuit work in the tiers above its deepest damaged tier,
+  - its own work at that tier,
+  - a Uniform(0–1) share of other same-tier work, since crews may reach other branches first.
+- **Time** = `crew_arrival_delay_hrs + crew-hours / crews`. Crews are assumed dedicated to the premise's circuit.
+- **Output:** P10/P50/P90 over 2,000 runs, rounded to 0.5 h, seeded so results are reproducible.
+  - Results are stable to about ±0.5 h across seeds and row orderings.
+  - The **bottleneck** is the upline device (named generically, from the topology) whose tier contributes the most expected time.
+
+## Demo storm timeline (`backend/demo/scenario.json`)
+- The timeline is **scripted demo state**, not live AEP data.
+- Its "confirmed" facts (outage, assessed damage, crews on site) stand in for what the outage-management system would supply, and they are labeled separately from model estimates in every answer.
+
+## Alerts and guidance (`backend/guidance.py`)
+- Rules are documented in code, and every response returns the full rules table.
+- Special needs come only from what the customer declares.
+- The internal life-support registry flag can raise backend escalation priority (`_internal`). It is always redacted before any output and recorded as redacted in the audit log; the assistant never confirms or denies registry membership.

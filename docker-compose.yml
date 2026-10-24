@@ -1,3 +1,20 @@
+# One command: `docker compose up -d --build`
+#   db      PostGIS
+#   loader  loads data/ into Postgres and publishes asset_risk (skips both when already done), then exits
+#   api     FastAPI on http://localhost:8000 (docs at /docs), starts after loader succeeds
+#   ml      on demand only: `docker compose run --rm ml` (retrain) / `... ml pytest -q tests` (tests)
+
+x-backend: &backend
+  build: ./backend
+  environment: &backend-env
+    DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER:-outage}:${POSTGRES_PASSWORD:-outage}@db:5432/${POSTGRES_DB:-outage}
+    DATA_DIR: /data
+    LLM_PROVIDER: ${LLM_PROVIDER:-groq}
+    GROQ_API_KEY: ${GROQ_API_KEY:-}
+    GROQ_MODEL: ${GROQ_MODEL:-openai/gpt-oss-120b}
+    GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+    GEMINI_MODEL: ${GEMINI_MODEL:-gemini-2.0-flash}
+
 services:
   db:
     image: postgis/postgis:16-3.4
@@ -16,24 +33,33 @@ services:
       retries: 20
 
   loader:
-    build: ./backend
+    <<: *backend
     environment:
-      DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER:-outage}:${POSTGRES_PASSWORD:-outage}@db:5432/${POSTGRES_DB:-outage}
-      DATA_DIR: /data
+      <<: *backend-env
+      FORCE_RELOAD: ${FORCE_RELOAD:-0}
     volumes:
       - ./data:/data:ro
     depends_on:
       db:
         condition: service_healthy
+    command: sh -c "python -m db.load_all && python -m ml.score_assets --if-missing"
 
-  # Train + score: docker compose run --rm ml
-  ml:
-    build: ./backend
-    profiles: ["ml"]
-    environment:
-      DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER:-outage}:${POSTGRES_PASSWORD:-outage}@db:5432/${POSTGRES_DB:-outage}
+  api:
+    <<: *backend
+    ports:
+      - "${API_PORT:-8000}:8000"
     volumes:
-      - ./backend:/app  # artifacts written back to backend/ml/artifacts
+      - ./backend:/app  # live code reload during development
+    depends_on:
+      loader:
+        condition: service_completed_successfully
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+
+  ml:
+    <<: *backend
+    profiles: ["ml"]
+    volumes:
+      - ./backend:/app  # artifacts are written back to backend/ml/artifacts
     depends_on:
       db:
         condition: service_healthy

@@ -17,7 +17,7 @@ from scipy.spatial import cKDTree
 from sqlalchemy.engine import Engine
 
 from . import explain
-from .db import METRIC_CRS, get_engine
+from .db import METRIC_CRS, get_engine, read_frame
 from .model import load_bundle
 
 DEVICE_TYPES = ("transformer", "fuse", "recloser", "switch")
@@ -31,6 +31,24 @@ CONF_MEDIUM_MIN_RECORDS = 5
 FACTOR_RANK_WEIGHTS = (1.0, 0.6, 0.3)
 
 
+def str_columns(cols: list[str]) -> dict:
+    """IDs like premise 032205817 or location 37800343D00129 must stay strings (keep leading zeros)."""
+    return {c: str for c in cols}
+
+
+def build_topology_graph(hops: pd.DataFrame) -> nx.DiGraph:
+    """premise -> transformer -> fuses/reclosers -> breaker, from rows sorted by (premise_nu, hop_seq)."""
+    nxt = hops.groupby("premise_nu", sort=False)["location_n"].shift(-1)
+    first = hops["premise_nu"] != hops["premise_nu"].shift()
+    g = nx.DiGraph()
+    g.add_edges_from(zip(zip(["premise"] * first.sum(), hops.loc[first, "premise_nu"]),
+                         zip(["device"] * first.sum(), hops.loc[first, "location_n"])))
+    chain = nxt.notna()
+    g.add_edges_from(zip(zip(["device"] * chain.sum(), hops.loc[chain, "location_n"]),
+                         zip(["device"] * chain.sum(), nxt[chain])))
+    return g
+
+
 def risk_band(p: float) -> str:
     return next(label for upper, label in BANDS if p < upper)
 
@@ -41,7 +59,13 @@ class PremiseScorer:
         self.bundle = load_bundle()
         self.levels = self.bundle["severity_levels"]
 
-        self.assets = pd.read_sql("SELECT * FROM asset_risk", engine)
+        factor_cols = ", ".join(f"factor_{k}, factor_{k}_value" for k in (1, 2, 3))
+        self.assets = read_frame(
+            f"SELECT asset_uid, asset_type, location_n, circuit_key, line_usage, x, y, p_low, p_medium, p_high, "
+            f"{factor_cols} FROM asset_risk", engine, dtype=str_columns(["location_n", "factor_1_value",
+                                                                       "factor_2_value", "factor_3_value"]))
+        for col in self.assets.select_dtypes(include="object").columns:  # SQL NULL -> None, as read_sql gave
+            self.assets[col] = self.assets[col].astype(object).where(self.assets[col].notna(), None)
         self.devices = self.assets[self.assets["asset_type"].isin(DEVICE_TYPES)].set_index("location_n")
         self.devices = self.devices[~self.devices.index.duplicated()]
         self.local = self.assets[self.assets["asset_type"].isin(["primary", "pole"])].reset_index(drop=True)
@@ -51,11 +75,11 @@ class PremiseScorer:
         self.backbone = {ck: g for ck, g in self.assets[self.assets["line_usage"] == "Backbone"].groupby("circuit_key")}
 
         # Customers: only routing fields + location (never critical_c / esri_defau, which live in customer_private).
-        cust = pd.read_sql(
+        cust = read_frame(
             f"""SELECT DISTINCT ON (premise_nu) premise_nu, circuit_key, aep_xfmr_l,
                        ST_X(ST_Transform(geom, {METRIC_CRS})) AS x, ST_Y(ST_Transform(geom, {METRIC_CRS})) AS y
                 FROM customers WHERE premise_nu IS NOT NULL ORDER BY premise_nu""",
-            engine,
+            engine, dtype=str_columns(["premise_nu", "aep_xfmr_l"]),
         )
         self.customers = cust.set_index("premise_nu")
         self.customer_tree = cKDTree(cust[["x", "y"]].to_numpy())
@@ -68,12 +92,9 @@ class PremiseScorer:
         self.circuit_records = arcos["circuit_key"].value_counts().to_dict()
         self.n_arcos = len(arcos)
 
-        hops = pd.read_sql("SELECT premise_nu, hop_seq, location_n FROM premise_upline ORDER BY premise_nu, hop_seq",
-                           engine)
-        self.graph = nx.DiGraph()
-        for premise, grp in hops.groupby("premise_nu", sort=False):
-            nodes = [("premise", premise)] + [("device", loc) for loc in grp["location_n"]]
-            nx.add_path(self.graph, nodes)
+        hops = read_frame("SELECT premise_nu, hop_seq, location_n FROM premise_upline ORDER BY premise_nu, hop_seq",
+                          engine, dtype=str_columns(["premise_nu", "location_n"]))
+        self.graph = build_topology_graph(hops)
         self.to_metric = Transformer.from_crs(4326, METRIC_CRS, always_xy=True)
 
     # ---- public API -------------------------------------------------------------------------
@@ -86,7 +107,7 @@ class PremiseScorer:
             return self._fallback(premise, severity, "We couldn't find this service location in our records.")
         cust = self.customers.loc[premise]
         in_topology = self.graph.has_node(("premise", premise))
-        parts = self._exposure(premise, cust, in_topology)
+        parts = self.exposure(premise, cust, in_topology)
         if not any(len(df) for df in parts.values()):
             return self._fallback(premise, severity, "There isn't enough network information near this location.")
         return self._result(premise, cust, severity, parts, in_topology)
@@ -105,7 +126,7 @@ class PremiseScorer:
 
     # ---- internals ----------------------------------------------------------------------------
 
-    def _exposure(self, premise: str, cust: pd.Series, in_topology: bool) -> dict[str, pd.DataFrame]:
+    def exposure(self, premise: str, cust: pd.Series, in_topology: bool) -> dict[str, pd.DataFrame]:
         upline = {loc for kind, loc in nx.descendants(self.graph, ("premise", premise)) if kind == "device"} \
             if in_topology else {cust["aep_xfmr_l"]}
         own = self.devices.loc[self.devices.index.intersection(list(upline))].reset_index()
