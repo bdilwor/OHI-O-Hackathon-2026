@@ -4,22 +4,43 @@ data/
 # Python
 __pycache__/
 *.py[cod]
+*.egg-info/
 .venv/
 venv/
-.pytest_cache/
 .ipynb_checkpoints/
+.mypy_cache/
+.ruff_cache/
 
-# ML intermediate datasets (model + metrics in backend/ml/artifacts are committed)
+# Tests (pytest in backend/tests)
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+
+# ML: intermediate datasets are rebuilt by `docker compose run --rm ml`.
+# The trained model (*.joblib), metrics, plots and ASSUMPTIONS.md in backend/ml/artifacts are committed
+# so the demo works without retraining.
 backend/ml/artifacts/*.parquet
 
-# Environment / secrets
+# Environment / secrets (commit a .env.example instead)
 .env
 .env.*
+!.env.example
 
-# Frontend (for later)
+# Docker: personal overrides
+docker-compose.override.yml
+
+# Frontend (React, for later)
 node_modules/
 dist/
 build/
+.vite/
+coverage/
+npm-debug.log*
+yarn-error.log*
+
+# Logs
+*.log
 
 # OS / editor
 .DS_Store
