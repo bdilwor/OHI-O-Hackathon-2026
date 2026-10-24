@@ -1,461 +1,654 @@
 {
-  "pre_storm|will i lose power": {
-    "reply": "**Confirmed by AEP:**  \nA storm is forecast or active in your area. No outage has been confirmed at your home.  \n\n**Model estimate:**  \nRisk\u202fBand: Very\u202fHigh. Estimated probability of an outage: 0.558 (\u224856%). Main drivers are nearby overhead lines and recent storm damage reports.  \n\n**What you can do:**  \n- Stay at least 35\u202fft from any downed line; call 911 then report it to AEP.  \n- Never run a generator indoors or in a garage.  \n- Keep refrigerator/freezer doors closed (\u22484\u202fh fridge, 48\u202fh freezer).  \n- Charge phones and battery packs now; have a flashlight with spare batteries.  \n- Store 1\u202fgal of water per person per day and non\u2011cooking food.  \n- Plan a warm/cool shelter and fill your car\u2019s gas tank.",
-    "card": {
-      "confirmed": [
-        "A storm is forecast or active in your area.",
-        "No outage has been confirmed at your home."
+  "pre_storm|replay|will i lose power": {
+    "reply": "During this hypothetical storm, there is a very high chance you could lose power. You qualify for a pre\u2011storm alert. Keep flashlights and a charged phone handy.",
+    "question_type": "risk",
+    "what_could_change": [
+      "This is a hypothetical storm; a real storm's strength and track would change the odds",
+      "About 69% of the estimated risk comes from power lines and poles within about 250 m of you.",
+      "There were 41 storm damage reports within about 500 m of you in past storms."
+    ],
+    "confidence": {
+      "score": 0.9,
+      "label": "High",
+      "missing": [
+        "tree and vegetation data near your power lines"
       ],
-      "storm_step": "pre_storm",
-      "estimate": {
-        "risk": {
-          "risk_band": "Very High",
-          "probability": 0.558,
-          "confidence": "High",
-          "top_factors": [
-            "About 69% of the estimated risk comes from power lines and poles within about 250 m of you.",
-            "Your power is carried on 12.47 kV distribution lines, a line class that saw more damage than average in past storms.",
-            "Your area relies on overhead primary lines, which were damaged more often than average in past storms.",
-            "There were 41 storm damage reports within about 500 m of you in past storms."
-          ],
-          "severity": "high"
-        },
-        "label": "MODEL_ESTIMATE"
-      },
-      "actions": [
-        {
-          "category": "EMERGENCY",
-          "text": "Stay at least 35 feet away from downed power lines and anything touching them. Call 911, then report the line to AEP.",
-          "why": "always"
-        },
-        {
-          "category": "SAFETY",
-          "text": "Never run a generator indoors or in a garage; keep it outside, away from windows.",
-          "why": "always"
-        },
-        {
-          "category": "SAFETY",
-          "text": "Keep the fridge and freezer closed: food stays cold about 4 hours in the fridge and 48 hours in a full freezer.",
-          "why": "food safety"
-        },
-        {
-          "category": "PREPARE",
-          "text": "Charge phones and battery packs now, and keep a flashlight with spare batteries.",
-          "why": "risk is Very High"
-        },
-        {
-          "category": "PREPARE",
-          "text": "Keep 1 gallon of water per person per day and food that needs no cooking.",
-          "why": "outages may last a while"
-        },
-        {
-          "category": "PREPARE",
-          "text": "Plan where you could go to stay warm or cool, and fill your car's gas tank.",
-          "why": "restoration could take a day or more"
-        },
-        {
-          "category": "PREPARE",
-          "text": "Consider staying with family or friends if you can, and check on neighbors.",
-          "why": "restoration could take more than a day"
-        }
-      ],
-      "declared_needs": []
+      "show_missing": false
     },
+    "storm": {
+      "mode": "replay",
+      "label": "Severe storm",
+      "summary": "a hypothetical storm like the February 2025 storm",
+      "when": "in this hypothetical storm",
+      "date": null,
+      "storm_n": 1254.0,
+      "lead_days": 0,
+      "hypothetical": true,
+      "forecast_available": true
+    },
+    "declared_needs": [],
+    "bottleneck": null,
     "tools_used": [
       "get_outage_risk",
+      "check_alert_eligibility"
+    ],
+    "fallback": false,
+    "mode": "llm",
+    "provider": "groq"
+  },
+  "pre_storm|replay|how long would repairs take": {
+    "reply": "In this hypothetical storm, repairs would most likely take about 10\u202fhours, with a likely range of roughly 2\u202fto\u202f26\u202fhours. You qualify for a pre\u2011storm alert, so stay prepared with flashlights and a charged phone.",
+    "question_type": "restoration",
+    "what_could_change": [
+      "How badly the fuse protecting your branch line is damaged (crews fix main-line devices first)",
+      "How many crews reach your area (4 assumed)",
+      "Fallen trees or blocked roads near your line, which add time to every repair"
+    ],
+    "confidence": {
+      "score": 0.6,
+      "label": "Medium",
+      "missing": [
+        "a field assessment of the actual damage on your line",
+        "how many crews will be assigned to your area",
+        "tree and vegetation data near your power lines"
+      ],
+      "show_missing": false
+    },
+    "storm": {
+      "mode": "replay",
+      "label": "Severe storm",
+      "summary": "a hypothetical storm like the February 2025 storm",
+      "when": "in this hypothetical storm",
+      "date": null,
+      "storm_n": 1254.0,
+      "lead_days": 0,
+      "hypothetical": true,
+      "forecast_available": true
+    },
+    "declared_needs": [],
+    "bottleneck": "the fuse protecting your branch line",
+    "tools_used": [
+      "estimate_restoration"
+    ],
+    "fallback": false,
+    "mode": "llm",
+    "provider": "groq"
+  },
+  "pre_storm|replay|what should i do to prepare": {
+    "reply": "Charge your phone and a backup battery, keep flashlights with spare batteries handy, and store enough water and non\u2011perishable food for at least a day. Stay at least 35\u202ffeet away from any downed power lines and never run a generator indoors.",
+    "question_type": "prep",
+    "what_could_change": [],
+    "confidence": {
+      "score": 0.9,
+      "label": "High",
+      "missing": [
+        "tree and vegetation data near your power lines"
+      ],
+      "show_missing": false
+    },
+    "storm": {
+      "mode": "replay",
+      "label": "Severe storm",
+      "summary": "a hypothetical storm like the February 2025 storm",
+      "when": "in this hypothetical storm",
+      "date": null,
+      "storm_n": 1254.0,
+      "lead_days": 0,
+      "hypothetical": true,
+      "forecast_available": true
+    },
+    "declared_needs": [],
+    "bottleneck": null,
+    "tools_used": [
       "prep_guidance"
     ],
     "fallback": false,
     "mode": "llm",
     "provider": "groq"
   },
-  "outage|how long could it last": {
-    "reply": "**Confirmed by AEP:**  \nA storm is forecast or active in your area. An outage affecting your home is confirmed.  \n\n**Model estimate:**  \nMost likely restoration time\u202f\u2248\u202f17\u202fhours. Likely range\u202f\u2248\u202f8\u202fhours (fast\u2011track) to\u202f32\u202fhours (worst case). Uncertainty comes from the number of line repairs, pole replacements, recloser work, overall circuit repairs, crew availability and a possible 6\u2011hour crew\u2011arrival delay.  \n\n**What you can do:**  \n- Keep refrigerator/freezer closed (\u22484\u202fh fridge, 48\u202fh freezer).  \n- Charge phones and have flashlights with spare batteries.  \n- Store water (1\u202fgal per person per day) and non\u2011perishable food.  \n- Stay at least 35\u202fft from any downed line; call 911 then report it to AEP.  \n- Avoid running generators indoors.",
-    "card": {
-      "confirmed": [
-        "A storm is forecast or active in your area.",
-        "An outage affecting your home is confirmed."
+  "pre_storm|replay|what if crews are delayed until tomorrow": {
+    "reply": "With a crew delay of about a day, the most likely restoration time moves to roughly 34\u202fhours after an outage\u2014about 24\u202fhours later than without the delay\u2014and the likely range is roughly 2\u202fto\u202f50\u202fhours. This is for the hypothetical storm described earlier. Keep your emergency supplies and stay clear of any downed lines.",
+    "question_type": "restoration",
+    "what_could_change": [
+      "How badly the fuse protecting your branch line is damaged (crews fix main-line devices first)",
+      "How many crews reach your area (4 assumed) and when (after 24 h)",
+      "Fallen trees or blocked roads near your line, which add time to every repair"
+    ],
+    "confidence": {
+      "score": 0.6,
+      "label": "Medium",
+      "missing": [
+        "a field assessment of the actual damage on your line",
+        "how many crews will be assigned to your area",
+        "tree and vegetation data near your power lines"
       ],
-      "storm_step": "outage",
-      "estimate": {
-        "risk": {
-          "risk_band": "Very High",
-          "probability": 0.558,
-          "confidence": "High",
-          "top_factors": [
-            "About 69% of the estimated risk comes from power lines and poles within about 250 m of you.",
-            "Your power is carried on 12.47 kV distribution lines, a line class that saw more damage than average in past storms.",
-            "Your area relies on overhead primary lines, which were damaged more often than average in past storms.",
-            "There were 41 storm damage reports within about 500 m of you in past storms."
-          ],
-          "severity": "high"
-        },
-        "restoration": {
-          "p10_hrs": 8.0,
-          "p50_hrs": 17.0,
-          "p90_hrs": 32.0,
-          "bottleneck_device": "the fuse protecting your branch line",
-          "drivers": [
-            "About 0.8 expected power-line repairs on or near your line",
-            "About 0.2 expected pole replacements on or near your line",
-            "About 0.1 expected recloser repairs on or near your line",
-            "About 11 repairs expected across the circuit that serves you",
-            "4 crews assigned to your circuit",
-            "Crews expected to arrive after 6 hours"
-          ],
-          "change_vs_previous": null
-        },
-        "label": "MODEL_ESTIMATE"
-      },
-      "actions": [
-        {
-          "category": "EMERGENCY",
-          "text": "Stay at least 35 feet away from downed power lines and anything touching them. Call 911, then report the line to AEP.",
-          "why": "always"
-        },
-        {
-          "category": "SAFETY",
-          "text": "Never run a generator indoors or in a garage; keep it outside, away from windows.",
-          "why": "always"
-        },
-        {
-          "category": "SAFETY",
-          "text": "Keep the fridge and freezer closed: food stays cold about 4 hours in the fridge and 48 hours in a full freezer.",
-          "why": "food safety"
-        },
-        {
-          "category": "PREPARE",
-          "text": "Charge phones and battery packs now, and keep a flashlight with spare batteries.",
-          "why": "risk is Very High"
-        },
-        {
-          "category": "PREPARE",
-          "text": "Keep 1 gallon of water per person per day and food that needs no cooking.",
-          "why": "outages may last a while"
-        },
-        {
-          "category": "PREPARE",
-          "text": "Plan where you could go to stay warm or cool, and fill your car's gas tank.",
-          "why": "restoration could take a day or more"
-        },
-        {
-          "category": "PREPARE",
-          "text": "Consider staying with family or friends if you can, and check on neighbors.",
-          "why": "restoration could take more than a day"
-        }
-      ],
-      "declared_needs": []
+      "show_missing": false
     },
+    "storm": {
+      "mode": "replay",
+      "label": "Severe storm",
+      "summary": "a hypothetical storm like the February 2025 storm",
+      "when": "in this hypothetical storm",
+      "date": null,
+      "storm_n": 1254.0,
+      "lead_days": 0,
+      "hypothetical": true,
+      "forecast_available": true
+    },
+    "declared_needs": [],
+    "bottleneck": "the fuse protecting your branch line",
     "tools_used": [
+      "estimate_restoration",
       "estimate_restoration"
     ],
     "fallback": false,
     "mode": "llm",
     "provider": "groq"
   },
-  "outage|what if crews cant arrive until tomorrow": {
-    "reply": "**Confirmed by AEP:**  \nA storm is forecast or active in your area. An outage affecting your home is confirmed.  \n\n**Model estimate:**  \nMost likely restoration\u202f\u2248\u202f35\u202fhours. Likely range\u202f\u2248\u202f26\u202fhours (fast) to\u202f50\u202fhours (slow). This is about 18\u202fhours later than the earlier estimate. Uncertainty comes from crew\u2011arrival delay, the number of line repairs, pole replacements and recloser work needed on your circuit.  \n\n**What you can do:**  \n- Keep refrigerator/freezer doors closed (\u22484\u202fh fridge, 48\u202fh freezer).  \n- Charge phones, have flashlights with spare batteries.  \n- Store water (1\u202fgal per person per day) and non\u2011perishable food.  \n- Stay at least 35\u202fft from any downed line; call 911 then report it to AEP.  \n- Never run a generator indoors.",
-    "card": {
-      "confirmed": [
-        "A storm is forecast or active in your area.",
-        "An outage affecting your home is confirmed."
+  "pre_storm|replay|do i qualify for outage alerts": {
+    "reply": "Yes, you qualify for pre\u2011storm outage alerts for the upcoming storm.",
+    "question_type": "alerts",
+    "what_could_change": [],
+    "confidence": {
+      "score": 0.9,
+      "label": "High",
+      "missing": [
+        "tree and vegetation data near your power lines"
       ],
-      "storm_step": "outage",
-      "estimate": {
-        "risk": {
-          "risk_band": "Very High",
-          "probability": 0.558,
-          "confidence": "High",
-          "top_factors": [
-            "About 69% of the estimated risk comes from power lines and poles within about 250 m of you.",
-            "Your power is carried on 12.47 kV distribution lines, a line class that saw more damage than average in past storms.",
-            "Your area relies on overhead primary lines, which were damaged more often than average in past storms.",
-            "There were 41 storm damage reports within about 500 m of you in past storms."
-          ],
-          "severity": "high"
-        },
-        "restoration": {
-          "p10_hrs": 26.0,
-          "p50_hrs": 35.0,
-          "p90_hrs": 50.0,
-          "bottleneck_device": "the fuse protecting your branch line",
-          "drivers": [
-            "About 0.8 expected power-line repairs on or near your line",
-            "About 0.2 expected pole replacements on or near your line",
-            "About 0.1 expected recloser repairs on or near your line",
-            "About 11 repairs expected across the circuit that serves you",
-            "4 crews assigned to your circuit",
-            "Crews expected to arrive after 24 hours"
-          ],
-          "change_vs_previous": {
-            "previous_p50_hrs": 17.0,
-            "previous_p90_hrs": 32.0,
-            "p50_change_hrs": 18.0,
-            "p90_change_hrs": 18.0
-          }
-        },
-        "label": "MODEL_ESTIMATE"
-      },
-      "actions": [
-        {
-          "category": "EMERGENCY",
-          "text": "Stay at least 35 feet away from downed power lines and anything touching them. Call 911, then report the line to AEP.",
-          "why": "always"
-        },
-        {
-          "category": "SAFETY",
-          "text": "Never run a generator indoors or in a garage; keep it outside, away from windows.",
-          "why": "always"
-        },
-        {
-          "category": "SAFETY",
-          "text": "Keep the fridge and freezer closed: food stays cold about 4 hours in the fridge and 48 hours in a full freezer.",
-          "why": "food safety"
-        },
-        {
-          "category": "PREPARE",
-          "text": "Charge phones and battery packs now, and keep a flashlight with spare batteries.",
-          "why": "risk is Very High"
-        },
-        {
-          "category": "PREPARE",
-          "text": "Keep 1 gallon of water per person per day and food that needs no cooking.",
-          "why": "outages may last a while"
-        },
-        {
-          "category": "PREPARE",
-          "text": "Plan where you could go to stay warm or cool, and fill your car's gas tank.",
-          "why": "restoration could take a day or more"
-        },
-        {
-          "category": "PREPARE",
-          "text": "Consider staying with family or friends if you can, and check on neighbors.",
-          "why": "restoration could take more than a day"
-        }
-      ],
-      "declared_needs": []
+      "show_missing": false
     },
+    "storm": {
+      "mode": "replay",
+      "label": "Severe storm",
+      "summary": "a hypothetical storm like the February 2025 storm",
+      "when": "in this hypothetical storm",
+      "date": null,
+      "storm_n": 1254.0,
+      "lead_days": 0,
+      "hypothetical": true,
+      "forecast_available": true
+    },
+    "declared_needs": [],
+    "bottleneck": null,
     "tools_used": [
-      "estimate_restoration"
+      "check_alert_eligibility"
     ],
     "fallback": false,
     "mode": "llm",
     "provider": "groq"
   },
-  "outage|i use an oxygen concentrator": {
-    "reply": "**Confirmed by AEP:**  \nA storm is forecast or active in your area. An outage affecting your home is confirmed.  \n\n**Model estimate:**  \nMost likely restoration\u202f\u2248\u202f17\u202fhours. Likely range\u202f\u2248\u202f8\u202fhours (fast) to\u202f32\u202fhours (slow). Uncertainty is driven by the number of line repairs, pole replacements, recloser work, overall circuit repairs and a possible 6\u2011hour crew\u2011arrival delay.  \n\n**What you can do:**  \n- Keep refrigerator/freezer closed (\u22484\u202fh fridge, 48\u202fh freezer).  \n- Charge phones, have flashlights with spare batteries.  \n- Store 1\u202fgal water per person per day and non\u2011cooking food.  \n- Stay \u226535\u202fft from any downed line; call 911 then report it to AEP.  \n- Never run a generator indoors.  \n- Ensure your oxygen concentrator\u2019s backup battery is fully charged and have a plan if it runs low.  \n\n*Alert rules:* You qualify for a human callback within\u202f1\u202fhour because of your medical need.",
-    "card": {
-      "confirmed": [
-        "A storm is forecast or active in your area.",
-        "An outage affecting your home is confirmed."
+  "pre_storm|replay|i use an oxygen concentrator": {
+    "reply": "Because you rely on an oxygen concentrator, you qualify for pre\u2011storm alerts and should ensure its battery is fully charged and have a backup power source or spare oxygen tanks ready. Keep flashlights, a charged phone, and enough water and non\u2011perishable food for at least a day, and stay at least 35\u202ffeet from any downed lines. If you lose power and cannot breathe, call 911 immediately.",
+    "question_type": "alerts",
+    "what_could_change": [],
+    "confidence": {
+      "score": 0.9,
+      "label": "High",
+      "missing": [
+        "tree and vegetation data near your power lines"
       ],
-      "storm_step": "outage",
-      "estimate": {
-        "risk": {
-          "risk_band": "Very High",
-          "probability": 0.558,
-          "confidence": "High",
-          "top_factors": [
-            "About 69% of the estimated risk comes from power lines and poles within about 250 m of you.",
-            "Your power is carried on 12.47 kV distribution lines, a line class that saw more damage than average in past storms.",
-            "Your area relies on overhead primary lines, which were damaged more often than average in past storms.",
-            "There were 41 storm damage reports within about 500 m of you in past storms."
-          ],
-          "severity": "high"
-        },
-        "restoration": {
-          "p10_hrs": 8.0,
-          "p50_hrs": 17.0,
-          "p90_hrs": 32.0,
-          "bottleneck_device": "the fuse protecting your branch line",
-          "drivers": [
-            "About 0.8 expected power-line repairs on or near your line",
-            "About 0.2 expected pole replacements on or near your line",
-            "About 0.1 expected recloser repairs on or near your line",
-            "About 11 repairs expected across the circuit that serves you",
-            "4 crews assigned to your circuit",
-            "Crews expected to arrive after 6 hours"
-          ],
-          "change_vs_previous": null
-        },
-        "label": "MODEL_ESTIMATE"
-      },
-      "actions": [
-        {
-          "category": "EMERGENCY",
-          "text": "Stay at least 35 feet away from downed power lines and anything touching them. Call 911, then report the line to AEP.",
-          "why": "always"
-        },
-        {
-          "category": "EMERGENCY",
-          "text": "Make sure your medical equipment has charged backup batteries and plan where you would go if they run low. If you can't breathe or are in danger, call 911.",
-          "why": "you told us you use powered medical equipment"
-        },
-        {
-          "category": "SAFETY",
-          "text": "Never run a generator indoors or in a garage; keep it outside, away from windows.",
-          "why": "always"
-        },
-        {
-          "category": "SAFETY",
-          "text": "Keep the fridge and freezer closed: food stays cold about 4 hours in the fridge and 48 hours in a full freezer.",
-          "why": "food safety"
-        },
-        {
-          "category": "PREPARE",
-          "text": "Charge phones and battery packs now, and keep a flashlight with spare batteries.",
-          "why": "risk is Very High"
-        },
-        {
-          "category": "PREPARE",
-          "text": "Keep 1 gallon of water per person per day and food that needs no cooking.",
-          "why": "outages may last a while"
-        },
-        {
-          "category": "PREPARE",
-          "text": "Plan where you could go to stay warm or cool, and fill your car's gas tank.",
-          "why": "restoration could take a day or more"
-        },
-        {
-          "category": "PREPARE",
-          "text": "Consider staying with family or friends if you can, and check on neighbors.",
-          "why": "restoration could take more than a day"
-        },
-        {
-          "category": "ALERT",
-          "text": "Send outage-confirmed message with estimate range (SMS + app push, Immediately)",
-          "why": "Outage confirmed at the customer's service location"
-        },
-        {
-          "category": "ALERT",
-          "text": "Escalate to a human callback (Phone call from a representative, Within 1 hour)",
-          "why": "Declared medical need and outage expected or lasting over 12 hours"
-        }
-      ],
-      "declared_needs": [
-        "medical_device"
-      ]
+      "show_missing": false
     },
+    "storm": {
+      "mode": "replay",
+      "label": "Severe storm",
+      "summary": "a hypothetical storm like the February 2025 storm",
+      "when": "in this hypothetical storm",
+      "date": null,
+      "storm_n": 1254.0,
+      "lead_days": 0,
+      "hypothetical": true,
+      "forecast_available": true
+    },
+    "declared_needs": [
+      "medical_device"
+    ],
+    "bottleneck": null,
     "tools_used": [
       "prep_guidance",
-      "check_alert_eligibility",
-      "estimate_restoration"
+      "check_alert_eligibility"
     ],
     "fallback": false,
     "mode": "llm",
     "provider": "groq"
   },
-  "outage|where are the crews right now": {
-    "reply": "**Confirmed by AEP:**  \nA storm is forecast or active in your area. An outage affecting your home is confirmed.  \n\n**Model estimate:**  \nRisk\u202fBand\u202f=\u202fVery\u202fHigh; estimated outage probability\u202f\u2248\u202f56\u202f%. Restoration most likely\u202f\u2248\u202f17\u202fhours, with a likely range of\u202f8\u202fto\u202f32\u202fhours.  \n\n**What you can do:**  \nI\u2019m sorry\u2014I can\u2019t share crew locations for safety and privacy reasons. Stay at least 35\u202fft from any downed line; call\u202f911 then report it to AEP. Keep your oxygen concentrator\u2019s battery fully charged, have a backup power source ready, and follow the food, water and shelter guidance above. If you need urgent assistance, call\u202fAEP\u202fcustomer service or request a callback (you qualify for a rapid callback because of your medical equipment).",
-    "card": {
-      "confirmed": [
-        "A storm is forecast or active in your area.",
-        "An outage affecting your home is confirmed."
-      ],
-      "storm_step": "outage",
-      "estimate": {
-        "risk": {
-          "risk_band": "Very High",
-          "probability": 0.558,
-          "confidence": "High",
-          "top_factors": [
-            "About 69% of the estimated risk comes from power lines and poles within about 250 m of you.",
-            "Your power is carried on 12.47 kV distribution lines, a line class that saw more damage than average in past storms.",
-            "Your area relies on overhead primary lines, which were damaged more often than average in past storms.",
-            "There were 41 storm damage reports within about 500 m of you in past storms."
-          ],
-          "severity": "high"
-        },
-        "restoration": {
-          "p10_hrs": 8.0,
-          "p50_hrs": 17.0,
-          "p90_hrs": 32.0,
-          "bottleneck_device": "the fuse protecting your branch line",
-          "drivers": [
-            "About 0.8 expected power-line repairs on or near your line",
-            "About 0.2 expected pole replacements on or near your line",
-            "About 0.1 expected recloser repairs on or near your line",
-            "About 11 repairs expected across the circuit that serves you",
-            "4 crews assigned to your circuit",
-            "Crews expected to arrive after 6 hours"
-          ],
-          "change_vs_previous": null
-        },
-        "label": "MODEL_ESTIMATE"
-      },
-      "actions": [
-        {
-          "category": "EMERGENCY",
-          "text": "Stay at least 35 feet away from downed power lines and anything touching them. Call 911, then report the line to AEP.",
-          "why": "always"
-        },
-        {
-          "category": "EMERGENCY",
-          "text": "Make sure your medical equipment has charged backup batteries and plan where you would go if they run low. If you can't breathe or are in danger, call 911.",
-          "why": "you told us you use powered medical equipment"
-        },
-        {
-          "category": "SAFETY",
-          "text": "Never run a generator indoors or in a garage; keep it outside, away from windows.",
-          "why": "always"
-        },
-        {
-          "category": "SAFETY",
-          "text": "Keep the fridge and freezer closed: food stays cold about 4 hours in the fridge and 48 hours in a full freezer.",
-          "why": "food safety"
-        },
-        {
-          "category": "PREPARE",
-          "text": "Charge phones and battery packs now, and keep a flashlight with spare batteries.",
-          "why": "risk is Very High"
-        },
-        {
-          "category": "PREPARE",
-          "text": "Keep 1 gallon of water per person per day and food that needs no cooking.",
-          "why": "outages may last a while"
-        },
-        {
-          "category": "PREPARE",
-          "text": "Plan where you could go to stay warm or cool, and fill your car's gas tank.",
-          "why": "restoration could take a day or more"
-        },
-        {
-          "category": "PREPARE",
-          "text": "Consider staying with family or friends if you can, and check on neighbors.",
-          "why": "restoration could take more than a day"
-        },
-        {
-          "category": "ALERT",
-          "text": "Send outage-confirmed message with estimate range (SMS + app push, Immediately)",
-          "why": "Outage confirmed at the customer's service location"
-        },
-        {
-          "category": "ALERT",
-          "text": "Escalate to a human callback (Phone call from a representative, Within 1 hour)",
-          "why": "Declared medical need and outage expected or lasting over 12 hours"
-        }
-      ],
-      "declared_needs": [
-        "medical_device"
-      ]
-    },
+  "pre_storm|replay|where are the crews right now": {
+    "reply": "I\u2019m sorry, but I can\u2019t share crew locations for safety and privacy reasons.",
+    "question_type": "other",
+    "what_could_change": [],
+    "confidence": null,
+    "storm": null,
+    "declared_needs": [
+      "medical_device"
+    ],
+    "bottleneck": null,
     "tools_used": [],
     "fallback": false,
     "mode": "llm",
     "provider": "groq"
   },
-  "outage|will i lose power": {
-    "reply": "**Confirmed by AEP:**  \nA storm is forecast or active in your area. No outage has been confirmed at your home.\n\n**Model estimate:**  \nWe could not locate your service address, so we cannot provide a reliable outage\u2011risk estimate or restoration time.\n\n**What you can do:**  \nFollow general storm\u2011prep steps: secure loose items, have flashlights and batteries ready, and unplug sensitive electronics. If the power goes out, report it to AEP. If you see downed lines or other danger, call\u202f911.",
-    "card": {
-      "confirmed": [
-        "A storm is forecast or active in your area.",
-        "No outage has been confirmed at your home."
+  "pre_storm|day0|will i lose power": {
+    "reply": "Based on today\u2019s calm weather forecast, the chance of losing power is low. You\u2019re unlikely to experience an outage. If you notice any downed lines, stay clear and call 911.",
+    "question_type": "risk",
+    "what_could_change": [
+      "The forecast: wind gusts up to 10 mph today. Stronger or weaker gusts than forecast move the odds most",
+      "About 73% of the estimated risk comes from power lines and poles within about 250 m of you.",
+      "There were 41 storm damage reports within about 500 m of you in past storms."
+    ],
+    "confidence": {
+      "score": 0.9,
+      "label": "High",
+      "missing": [
+        "tree and vegetation data near your power lines"
       ],
-      "storm_step": "outage",
-      "estimate": {},
-      "actions": [],
-      "declared_needs": []
+      "show_missing": false
     },
+    "storm": {
+      "mode": "forecast",
+      "label": "Calm",
+      "summary": "calm weather today (cloudy, gusts up to 10 mph)",
+      "when": "today",
+      "date": "2026-10-24",
+      "storm_n": 0.25,
+      "lead_days": 0,
+      "hypothetical": false,
+      "forecast_available": true
+    },
+    "declared_needs": [],
+    "bottleneck": null,
+    "tools_used": [
+      "get_outage_risk",
+      "check_alert_eligibility"
+    ],
+    "fallback": false,
+    "mode": "llm",
+    "provider": "groq"
+  },
+  "pre_storm|day0|how long would repairs take": {
+    "reply": "If an outage occurs today\u2019s calm weather, repairs would most likely be completed in about\u202f1.5\u202fhours, with a typical range of roughly\u202f0.5\u202fto\u202f6\u202fhours.",
+    "question_type": "restoration",
+    "what_could_change": [
+      "How badly the fuse protecting your branch line is damaged (crews fix main-line devices first)",
+      "How many crews reach your area (4 assumed)",
+      "Fallen trees or blocked roads near your line, which add time to every repair"
+    ],
+    "confidence": {
+      "score": 0.6,
+      "label": "Medium",
+      "missing": [
+        "a field assessment of the actual damage on your line",
+        "how many crews will be assigned to your area",
+        "tree and vegetation data near your power lines"
+      ],
+      "show_missing": false
+    },
+    "storm": {
+      "mode": "forecast",
+      "label": "Calm",
+      "summary": "calm weather today (cloudy, gusts up to 10 mph)",
+      "when": "today",
+      "date": "2026-10-24",
+      "storm_n": 0.25,
+      "lead_days": 0,
+      "hypothetical": false,
+      "forecast_available": true
+    },
+    "declared_needs": [],
+    "bottleneck": "the fuse protecting your branch line",
+    "tools_used": [
+      "estimate_restoration"
+    ],
+    "fallback": false,
+    "mode": "llm",
+    "provider": "groq"
+  },
+  "pre_storm|day0|what should i do to prepare": {
+    "reply": "Charge your phone and keep a flashlight handy, and keep the fridge and freezer closed to preserve food. Stay at least\u202f35\u202ffeet from any downed power lines, call\u202f911, then report the line to AEP. Never run a generator indoors; keep it outside and away from windows.",
+    "question_type": "prep",
+    "what_could_change": [],
+    "confidence": {
+      "score": 0.9,
+      "label": "High",
+      "missing": [
+        "tree and vegetation data near your power lines"
+      ],
+      "show_missing": false
+    },
+    "storm": {
+      "mode": "forecast",
+      "label": "Calm",
+      "summary": "calm weather today (cloudy, gusts up to 10 mph)",
+      "when": "today",
+      "date": "2026-10-24",
+      "storm_n": 0.25,
+      "lead_days": 0,
+      "hypothetical": false,
+      "forecast_available": true
+    },
+    "declared_needs": [],
+    "bottleneck": null,
+    "tools_used": [
+      "prep_guidance"
+    ],
+    "fallback": false,
+    "mode": "llm",
+    "provider": "groq"
+  },
+  "pre_storm|day0|what if crews are delayed until tomorrow": {
+    "reply": "If crews are delayed until tomorrow, the most likely repair time moves to about\u202f25.5\u202fhours after the outage, with a likely range of roughly\u202f24.5\u202fto\u202f30\u202fhours under today\u2019s calm weather forecast. That\u2019s about\u202f24\u202fhours longer than the usual estimate. Stay clear of any downed lines and call\u202f911\u202fif you see danger.",
+    "question_type": "restoration",
+    "what_could_change": [
+      "How badly the fuse protecting your branch line is damaged (crews fix main-line devices first)",
+      "How many crews reach your area (4 assumed) and when (after 24 h)",
+      "Fallen trees or blocked roads near your line, which add time to every repair"
+    ],
+    "confidence": {
+      "score": 0.6,
+      "label": "Medium",
+      "missing": [
+        "a field assessment of the actual damage on your line",
+        "how many crews will be assigned to your area",
+        "tree and vegetation data near your power lines"
+      ],
+      "show_missing": false
+    },
+    "storm": {
+      "mode": "forecast",
+      "label": "Calm",
+      "summary": "calm weather Sun 10-25 (cloudy, gusts up to 10 mph)",
+      "when": "Sun 10-25",
+      "date": "2026-10-25",
+      "storm_n": 0.26,
+      "lead_days": 1,
+      "hypothetical": false,
+      "forecast_available": true
+    },
+    "declared_needs": [],
+    "bottleneck": "the fuse protecting your branch line",
+    "tools_used": [
+      "estimate_restoration",
+      "estimate_restoration",
+      "check_alert_eligibility"
+    ],
+    "fallback": false,
+    "mode": "llm",
+    "provider": "groq"
+  },
+  "pre_storm|day0|do i qualify for outage alerts": {
+    "reply": "You\u2019re not automatically enrolled in outage alerts, but you can sign up for them at any time.",
+    "question_type": "alerts",
+    "what_could_change": [],
+    "confidence": {
+      "score": 0.9,
+      "label": "High",
+      "missing": [
+        "tree and vegetation data near your power lines"
+      ],
+      "show_missing": false
+    },
+    "storm": {
+      "mode": "forecast",
+      "label": "Calm",
+      "summary": "calm weather today (cloudy, gusts up to 10 mph)",
+      "when": "today",
+      "date": "2026-10-24",
+      "storm_n": 0.25,
+      "lead_days": 0,
+      "hypothetical": false,
+      "forecast_available": true
+    },
+    "declared_needs": [],
+    "bottleneck": null,
+    "tools_used": [
+      "check_alert_eligibility"
+    ],
+    "fallback": false,
+    "mode": "llm",
+    "provider": "groq"
+  },
+  "pre_storm|day0|i use an oxygen concentrator": {
+    "reply": "Yes\u2014you qualify for pre\u2011storm alerts and a check\u2011in call because you\u2019ve declared a medical\u2011device need. Make sure your oxygen concentrator\u2019s backup battery is fully charged and have a plan for a safe location if the power goes out.",
+    "question_type": "alerts",
+    "what_could_change": [],
+    "confidence": {
+      "score": 0.9,
+      "label": "High",
+      "missing": [
+        "tree and vegetation data near your power lines"
+      ],
+      "show_missing": false
+    },
+    "storm": {
+      "mode": "forecast",
+      "label": "Calm",
+      "summary": "calm weather today (cloudy, gusts up to 10 mph)",
+      "when": "today",
+      "date": "2026-10-24",
+      "storm_n": 0.25,
+      "lead_days": 0,
+      "hypothetical": false,
+      "forecast_available": true
+    },
+    "declared_needs": [
+      "medical_device"
+    ],
+    "bottleneck": null,
+    "tools_used": [
+      "prep_guidance",
+      "check_alert_eligibility"
+    ],
+    "fallback": false,
+    "mode": "llm",
+    "provider": "groq"
+  },
+  "pre_storm|day0|where are the crews right now": {
+    "reply": "I\u2019m sorry, but I can\u2019t share crew locations for safety and privacy reasons. If you have any safety concerns, please call\u202f911.",
+    "question_type": "other",
+    "what_could_change": [],
+    "confidence": null,
+    "storm": null,
+    "declared_needs": [
+      "medical_device"
+    ],
+    "bottleneck": null,
+    "tools_used": [],
+    "fallback": false,
+    "mode": "llm",
+    "provider": "groq"
+  },
+  "pre_storm|dayauto|will i lose power": {
+    "reply": "Based on the forecast for calm weather\u202fFri\u202f10\u201130, the risk of losing power at your home is low. You\u2019re unlikely to experience an outage.",
+    "question_type": "risk",
+    "what_could_change": [
+      "The forecast: wind gusts up to 16 mph Fri 10-30. Stronger or weaker gusts than forecast move the odds most",
+      "About 73% of the estimated risk comes from power lines and poles within about 250 m of you.",
+      "There were 41 storm damage reports within about 500 m of you in past storms."
+    ],
+    "confidence": {
+      "score": 0.72,
+      "label": "Medium",
+      "missing": [
+        "a closer-range weather forecast (this day is several days out)",
+        "tree and vegetation data near your power lines"
+      ],
+      "show_missing": false
+    },
+    "storm": {
+      "mode": "forecast",
+      "label": "Calm",
+      "summary": "calm weather Fri 10-30 (clear, gusts up to 16 mph)",
+      "when": "Fri 10-30",
+      "date": "2026-10-30",
+      "storm_n": 0.4,
+      "lead_days": 6,
+      "hypothetical": false,
+      "forecast_available": true
+    },
+    "declared_needs": [],
+    "bottleneck": null,
+    "tools_used": [
+      "get_outage_risk",
+      "check_alert_eligibility"
+    ],
+    "fallback": false,
+    "mode": "llm",
+    "provider": "groq"
+  },
+  "outage|dayauto|how long could it last": {
+    "reply": "For the calm weather forecast on\u202fFri\u202f10\u201130, the most likely restoration time is about\u202f7.5\u202fhours, with a likely range of roughly\u202f6.5\u202fto\u202f12\u202fhours. If you notice any hazards, stay clear of downed lines and call\u202f911\u202ffor emergencies.",
+    "question_type": "restoration",
+    "what_could_change": [
+      "How badly the fuse protecting your branch line is damaged (crews fix main-line devices first)",
+      "How many crews reach your area (4 assumed) and when (after 6 h)",
+      "Fallen trees or blocked roads near your line, which add time to every repair"
+    ],
+    "confidence": {
+      "score": 0.42,
+      "label": "Low",
+      "missing": [
+        "a closer-range weather forecast (this day is several days out)",
+        "a field assessment of the actual damage on your line",
+        "how many crews will be assigned to your area"
+      ],
+      "show_missing": true
+    },
+    "storm": {
+      "mode": "forecast",
+      "label": "Calm",
+      "summary": "calm weather Fri 10-30 (clear, gusts up to 16 mph)",
+      "when": "Fri 10-30",
+      "date": "2026-10-30",
+      "storm_n": 0.4,
+      "lead_days": 6,
+      "hypothetical": false,
+      "forecast_available": true
+    },
+    "declared_needs": [],
+    "bottleneck": "the fuse protecting your branch line",
+    "tools_used": [
+      "estimate_restoration"
+    ],
+    "fallback": false,
+    "mode": "llm",
+    "provider": "groq"
+  },
+  "outage|dayauto|what if crews cant arrive until tomorrow": {
+    "reply": "If crews can\u2019t arrive until tomorrow, the most likely restoration time moves to about\u202f25.5\u202fhours, roughly\u202f18\u202fhours later than the original estimate, with a likely range of about\u202f24.5\u202fto\u202f30\u202fhours. An outage\u2011confirmed alert is being sent per our system rules. Stay clear of any downed lines and call\u202f911\u202fif you see a hazard.",
+    "question_type": "restoration",
+    "what_could_change": [
+      "How badly the fuse protecting your branch line is damaged (crews fix main-line devices first)",
+      "How many crews reach your area (4 assumed) and when (after 24 h)",
+      "Fallen trees or blocked roads near your line, which add time to every repair"
+    ],
+    "confidence": {
+      "score": 0.6,
+      "label": "Medium",
+      "missing": [
+        "a field assessment of the actual damage on your line",
+        "how many crews will be assigned to your area",
+        "tree and vegetation data near your power lines"
+      ],
+      "show_missing": false
+    },
+    "storm": {
+      "mode": "forecast",
+      "label": "Calm",
+      "summary": "calm weather Sun 10-25 (cloudy, gusts up to 10 mph)",
+      "when": "Sun 10-25",
+      "date": "2026-10-25",
+      "storm_n": 0.26,
+      "lead_days": 1,
+      "hypothetical": false,
+      "forecast_available": true
+    },
+    "declared_needs": [],
+    "bottleneck": "the fuse protecting your branch line",
+    "tools_used": [
+      "estimate_restoration",
+      "estimate_restoration",
+      "check_alert_eligibility"
+    ],
+    "fallback": false,
+    "mode": "llm",
+    "provider": "groq"
+  },
+  "outage|dayauto|i use an oxygen concentrator": {
+    "reply": "With crews delayed until tomorrow, the most likely restoration time is about\u202f25.5\u202fhours, roughly\u202f24\u202fto\u202f30\u202fhours. Because you rely on an oxygen concentrator, be sure its backup battery is fully charged and have a safe place to go if the power runs out; call\u202f911\u202fif you encounter any danger. An outage\u2011confirmed alert is being sent per our system rules.",
+    "question_type": "alerts",
+    "what_could_change": [],
+    "confidence": {
+      "score": 0.72,
+      "label": "Medium",
+      "missing": [
+        "a closer-range weather forecast (this day is several days out)",
+        "tree and vegetation data near your power lines"
+      ],
+      "show_missing": false
+    },
+    "storm": {
+      "mode": "forecast",
+      "label": "Calm",
+      "summary": "calm weather Fri 10-30 (clear, gusts up to 16 mph)",
+      "when": "Fri 10-30",
+      "date": "2026-10-30",
+      "storm_n": 0.4,
+      "lead_days": 6,
+      "hypothetical": false,
+      "forecast_available": true
+    },
+    "declared_needs": [
+      "medical_device"
+    ],
+    "bottleneck": null,
+    "tools_used": [
+      "prep_guidance",
+      "check_alert_eligibility"
+    ],
+    "fallback": false,
+    "mode": "llm",
+    "provider": "groq"
+  },
+  "outage|dayauto|where are the crews right now": {
+    "reply": "I\u2019m sorry, but I can\u2019t share crew locations for safety and privacy reasons. If you have any safety concerns, please call\u202f911.",
+    "question_type": "other",
+    "what_could_change": [],
+    "confidence": null,
+    "storm": null,
+    "declared_needs": [
+      "medical_device"
+    ],
+    "bottleneck": null,
+    "tools_used": [],
+    "fallback": false,
+    "mode": "llm",
+    "provider": "groq"
+  },
+  "outage|dayauto|will i lose power": {
+    "reply": "We don\u2019t have enough information to tell if your power will be lost during the forecast calm weather on Fri\u202f10\u201130. Please follow general storm\u2011preparation guidance and report any outage you experience. If you see downed lines, stay clear and call\u202f911.",
+    "question_type": "other",
+    "what_could_change": [],
+    "confidence": {
+      "score": 0.1,
+      "label": "Low",
+      "show_missing": true,
+      "missing": [
+        "your home in our service records",
+        "your home's connection in the grid map",
+        "past storm records for your line"
+      ]
+    },
+    "storm": {
+      "mode": "forecast",
+      "label": "Calm",
+      "summary": "calm weather Fri 10-30 (clear, gusts up to 16 mph)",
+      "when": "Fri 10-30",
+      "date": "2026-10-30",
+      "storm_n": 0.4,
+      "lead_days": 6,
+      "hypothetical": false,
+      "forecast_available": true
+    },
+    "declared_needs": [],
     "tools_used": [
       "get_outage_risk"
     ],
@@ -463,99 +656,16 @@
     "mode": "llm",
     "provider": "groq"
   },
-  "restored|is my power back": {
-    "reply": "**Confirmed by AEP:**  \nPower has been restored to your home.  \n\n**Model estimate:**  \nNo current outage, so no restoration time estimate is applicable.  \n\n**What you can do:**  \n- Verify that your oxygen concentrator is running and its battery is fully charged.  \n- Keep a backup power source (e.g., UPS) ready in case the grid drops again.  \n- Stay alert for any future alerts; if you see a downed line, stay \u226535\u202fft away and call\u202f911 then report it to AEP.  \n- Keep phones charged and have flashlights with spare batteries.",
-    "card": {
-      "confirmed": [
-        "Power has been restored to your home."
-      ],
-      "storm_step": "restored",
-      "estimate": {
-        "risk": {
-          "risk_band": "Very High",
-          "probability": 0.558,
-          "confidence": "High",
-          "top_factors": [
-            "About 69% of the estimated risk comes from power lines and poles within about 250 m of you.",
-            "Your power is carried on 12.47 kV distribution lines, a line class that saw more damage than average in past storms.",
-            "Your area relies on overhead primary lines, which were damaged more often than average in past storms.",
-            "There were 41 storm damage reports within about 500 m of you in past storms."
-          ],
-          "severity": "high"
-        },
-        "restoration": {
-          "p10_hrs": 8.0,
-          "p50_hrs": 17.0,
-          "p90_hrs": 32.0,
-          "bottleneck_device": "the fuse protecting your branch line",
-          "drivers": [
-            "About 0.8 expected power-line repairs on or near your line",
-            "About 0.2 expected pole replacements on or near your line",
-            "About 0.1 expected recloser repairs on or near your line",
-            "About 11 repairs expected across the circuit that serves you",
-            "4 crews assigned to your circuit",
-            "Crews expected to arrive after 6 hours"
-          ],
-          "change_vs_previous": null
-        },
-        "label": "MODEL_ESTIMATE"
-      },
-      "actions": [
-        {
-          "category": "EMERGENCY",
-          "text": "Stay at least 35 feet away from downed power lines and anything touching them. Call 911, then report the line to AEP.",
-          "why": "always"
-        },
-        {
-          "category": "EMERGENCY",
-          "text": "Make sure your medical equipment has charged backup batteries and plan where you would go if they run low. If you can't breathe or are in danger, call 911.",
-          "why": "you told us you use powered medical equipment"
-        },
-        {
-          "category": "SAFETY",
-          "text": "Never run a generator indoors or in a garage; keep it outside, away from windows.",
-          "why": "always"
-        },
-        {
-          "category": "SAFETY",
-          "text": "Keep the fridge and freezer closed: food stays cold about 4 hours in the fridge and 48 hours in a full freezer.",
-          "why": "food safety"
-        },
-        {
-          "category": "PREPARE",
-          "text": "Charge phones and battery packs now, and keep a flashlight with spare batteries.",
-          "why": "risk is Very High"
-        },
-        {
-          "category": "PREPARE",
-          "text": "Keep 1 gallon of water per person per day and food that needs no cooking.",
-          "why": "outages may last a while"
-        },
-        {
-          "category": "PREPARE",
-          "text": "Plan where you could go to stay warm or cool, and fill your car's gas tank.",
-          "why": "restoration could take a day or more"
-        },
-        {
-          "category": "PREPARE",
-          "text": "Consider staying with family or friends if you can, and check on neighbors.",
-          "why": "restoration could take more than a day"
-        },
-        {
-          "category": "ALERT",
-          "text": "Send outage-confirmed message with estimate range (SMS + app push, Immediately)",
-          "why": "Outage confirmed at the customer's service location"
-        },
-        {
-          "category": "ALERT",
-          "text": "Escalate to a human callback (Phone call from a representative, Within 1 hour)",
-          "why": "Declared medical need and outage expected or lasting over 12 hours"
-        }
-      ],
-      "declared_needs": [
-        "medical_device"
-      ]
-    },
+  "restored|dayauto|is my power back": {
+    "reply": "Yes, power has been restored to your home. If you notice any issues, stay clear of downed lines and call\u202f911\u202ffor emergencies.",
+    "question_type": "other",
+    "what_could_change": [],
+    "confidence": null,
+    "storm": null,
+    "declared_needs": [
+      "medical_device"
+    ],
+    "bottleneck": null,
     "tools_used": [],
     "fallback": false,
     "mode": "llm",

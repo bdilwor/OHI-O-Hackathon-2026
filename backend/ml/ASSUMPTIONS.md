@@ -175,3 +175,49 @@ Replaced parts count removal + install hours; new connectors count install only.
 - Rules are documented in code, and every response returns the full rules table.
 - Special needs come only from what the customer declares.
 - The internal life-support registry flag can raise backend escalation priority (`_internal`). It is always redacted before any output and recorded as redacted in the audit log; the assistant never confirms or denies registry membership.
+
+---
+
+# Live forecast → storm size, continuous scenarios, and answer confidence
+
+## Forecast bridge (`backend/forecast.py`)
+- **Source:** Open-Meteo daily forecast (free, no key), today plus 6 days, for the customer's home. Cached for 1 hour. If the API can't be reached, the app assumes calm weather and lowers confidence.
+- **Why a bridge is needed:** the risk model was trained on *storm size* (damage reports across the area), not on weather. Each forecast day's peak wind gust is mapped to a storm size by log-interpolating these anchors:
+
+| Peak gust | Expected damage reports | Anchor |
+|---|---|---|
+| ≤ 20 mph | 0.5 | calm |
+| 30 mph | 2 | breezy |
+| 40 mph | 12 | median minor event in our data |
+| 50 mph | 60 | |
+| 58 mph (NWS "severe") | 194 | the September 2024 storm |
+| ≥ 70 mph | 1,254 | the February 2025 storm |
+
+- **Multipliers (capped at 2,000):** freezing rain or ≥ 4 in of snow ×4; thunderstorms ×2; ≥ 2 in of rain ×1.5.
+- **Limits:** this is a transparent, judgment-based bridge, not a fitted weather model. Real storms vary in track, duration and tree loading. The confidence meter reflects forecast lead time.
+- **Replay:** a "storm like Feb 2025" uses the historical storm size (1,254 reports) and is always labeled hypothetical.
+
+## Continuous storm size (`ml/score.py: p_at`)
+- **Per-asset P(damage) at any storm size** is log–log interpolated between the stored anchors (12, 194 and 1,254 reports). It is linear below 12 and proportional above 1,254, capped at 0.95. The anchors are reproduced exactly, and the risk rises monotonically with storm size.
+
+## Map estimates (`backend/mapdata.py`)
+- **A neighbor home's color** is an *area* estimate: 1 − Π(1 − p) over equipment within 150 m. The customer's own home uses the full premise model (supply path + nearby + main line).
+- **Trees** are placed only inside OpenStreetMap wooded and park polygons from the basemap and colored like the nearest home. The challenge data has no vegetation, so trees are illustrative of *where* vegetation is, not a model input.
+
+## Answer confidence (`backend/confidence.py`)
+- **A data-support score in 0–1, not a statistical probability.** It starts at 0.95 for outage-chance answers and 0.90 for repair-time answers; each gap subtracts a fixed amount:
+
+| Gap | Penalty | Shown as missing |
+|---|---|---|
+| < 5 / < 20 past damage records on the customer's line | 0.30 / 0.15 | past storm records for your line |
+| Home not in the grid map (topology) | 0.15 | your home's exact connection |
+| Forecast 2–3 / 4–6 days out | 0.08 / 0.18 | a closer-range forecast |
+| No live forecast | 0.25 | a live weather forecast |
+| (repair time) no field damage assessment | 0.15 | a field assessment of actual damage |
+| (repair time) crew assignment unknown | 0.10 | how many crews are assigned |
+| Always: no vegetation data | 0.05 | tree and vegetation data |
+
+- **Labels:** High ≥ 0.75, Medium ≥ 0.60, Low below that. Below 0.60, the app lists the top 3 missing items.
+- **"What could change this":** deterministic and taken from tool results.
+  - **Outage chance:** the forecast driver, the top model factor, and local damage history.
+  - **Repair time:** the bottleneck device, crew count and arrival, and fallen trees or blocked roads.

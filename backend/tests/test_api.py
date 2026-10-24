@@ -111,4 +111,4 @@ def test_demo_storm_facts_only_apply_to_demo_home(client, fresh_storm):
     assert "R3_OUTAGE_CONFIRMED" not in {r["id"] for r in alerts["rules_fired"]}
     reply = client.post("/chat", json={"message": "How long could it last?", "premise": other,
                                        "session_id": "other-home"}).json()["reply"]
-    assert "No outage has been confirmed" in reply and "If your power goes out" in reply
+    assert "If your power goes out" in reply and "confirmed" not in reply

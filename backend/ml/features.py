@@ -104,7 +104,7 @@ def load_assets(engine: Engine) -> gpd.GeoDataFrame:
     rep[is_line] = a.loc[is_line].geometry.interpolate(0.5, normalized=True)
     a["x"], a["y"] = rep.x.to_numpy(), rep.y.to_numpy()
 
-    a["install_date"] = pd.to_datetime(a["install_date"], errors="coerce")
+    a["install_date"] = pd.to_datetime(a["install_date"], errors="coerce", format="mixed")  # DB dates/strings
     a["segment_len_m"] = a.geometry.length.where(is_line)
     a["overhead"] = a["mounting"].map({"Overhead": 1.0, "Underground": 0.0})
     a.loc[a["asset_type"] == "pole", "overhead"] = 1.0

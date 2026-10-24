@@ -25,29 +25,52 @@ def chat(client, message, sid, **kw):
 def test_core_questions_use_the_right_tool(client, fresh_storm, question, tool):
     r = chat(client, question, f"core-{tool}", premise=DEMO_PREMISE)
     assert tool in r["tools_used"] and not r["fallback"]
-    for heading in ("Confirmed by AEP:", "Model estimate:", "What you can do:"):
-        assert heading in r["reply"]
+    assert "Confirmed by AEP:" not in r["reply"]  # direct answer, no section headings
+    assert 0 < r["confidence"]["score"] <= 1 and r["confidence"]["label"] in {"High", "Medium", "Low"}
 
 
-def test_card_is_built_from_tool_results(client, fresh_storm):
-    r = chat(client, "Will I lose power?", "card", premise=DEMO_PREMISE)
+@pytest.mark.parametrize("question,qtype", [("Will I lose power?", "risk"),
+                                            ("How long could restoration take?", "restoration")])
+def test_risk_and_repair_answers_list_what_could_change(client, fresh_storm, question, qtype):
+    r = chat(client, question, f"changers-{qtype}", premise=DEMO_PREMISE)
+    assert r["question_type"] == qtype and 2 <= len(r["what_could_change"]) <= 3
+
+
+def test_answer_numbers_come_from_the_model(client, fresh_storm):
+    r = chat(client, "Will I lose power?", "numbers", premise=DEMO_PREMISE)
     risk = client.post("/tools/get_outage_risk", json={"premise": DEMO_PREMISE}).json()
-    assert r["card"]["estimate"]["risk"]["probability"] == risk["probability"]
-    assert r["card"]["confirmed"] and r["card"]["estimate"]["label"] == "MODEL_ESTIMATE"
+    assert f"{risk['probability'] * 100:.0f}%" in r["reply"] and r["storm"]["label"] == risk["storm"]["label"]
+
+
+def test_storm_setting_from_the_map_drives_the_answer(client, fresh_storm):
+    calm = chat(client, "Will I lose power?", "calm-day", premise=DEMO_PREMISE, storm={"mode": "forecast", "day": 1})
+    stormy = chat(client, "Will I lose power?", "stormy-day", premise=DEMO_PREMISE, storm={"mode": "forecast", "day": 0})
+    assert "low" in calm["reply"] and calm["storm"]["label"] == "Calm"
+    assert stormy["storm"]["storm_n"] > calm["storm"]["storm_n"]
+
+
+def test_low_confidence_lists_missing_data(client, fresh_storm):
+    r = chat(client, "How long could it last?", "far-day", premise=DEMO_PREMISE, storm={"mode": "forecast", "day": 6})
+    assert r["confidence"]["score"] < 0.6 and r["confidence"]["show_missing"]
+    assert 2 <= len(r["confidence"]["missing"]) <= 3
+
+
+def test_day_named_in_question(client, fresh_storm):
+    r = chat(client, "Will I lose power tomorrow?", "tomorrow", premise=DEMO_PREMISE)
+    assert r["question_type"] == "risk" and r["storm"]["lead_days"] == 1
 
 
 def test_what_if_reports_change(client, fresh_storm):
     sid = "whatif"
     chat(client, "How long could it last?", sid, premise=DEMO_PREMISE)
     r = chat(client, "What if crews can't arrive until tomorrow?", sid)
-    change = r["card"]["estimate"]["restoration"]["change_vs_previous"]
-    assert change["p50_change_hrs"] > 0 and "later than the previous estimate" in r["reply"]
+    assert r["question_type"] == "restoration" and "later than before" in r["reply"]
 
 
 def test_declared_medical_need_escalates_without_promises(client, fresh_storm):
     client.post("/storm/advance")  # outage confirmed
     r = chat(client, "I use an oxygen concentrator", "medical", premise=DEMO_PREMISE)
-    assert "medical_device" in r["card"]["declared_needs"]
+    assert "medical_device" in r["declared_needs"]
     assert "callback" in r["reply"] and "can't schedule it myself" in r["reply"]
     assert "dispatched" not in r["reply"].lower()
 
@@ -64,6 +87,7 @@ def test_no_location_and_unknown_location_fall_back(client):
     assert r["fallback"] and "35 feet" in r["reply"]
     r = chat(client, "Will I lose power?", "unknown", premise="999")
     assert r["fallback"] and "couldn't find" in r["reply"] and "911" in r["reply"]
+    assert r["confidence"]["score"] < 0.6 and r["confidence"]["missing"]
 
 
 def test_intent_and_what_if_parsing():
@@ -109,11 +133,12 @@ def test_llm_tool_loop_and_grounded_reply(client, fresh_storm, fake_llm):
     pct = round(risk["probability"] * 100)
     fake_llm += [
         SimpleNamespace(content="", tool_calls=[_tool_call("get_outage_risk", {}, 1)]),
-        SimpleNamespace(content=f"Confirmed by AEP: no outage yet.\nModel estimate: {risk['risk_band']} risk, "
-                                f"about {pct}%.\nWhat you can do: charge your phone.", tool_calls=None),
+        SimpleNamespace(content=f"Your outage risk is {risk['risk_band']}: about {pct}%.", tool_calls=None),
     ]
     r = chat(client, "Will I lose power?", "llm-ok", premise=DEMO_PREMISE)
-    assert r["mode"] == "llm" and r["tools_used"] == ["get_outage_risk"] and f"{pct}%" in r["reply"]
+    # The backend pre-runs the model for core questions, then the LLM's own tool call runs too.
+    assert r["mode"] == "llm" and r["tools_used"] == ["get_outage_risk", "get_outage_risk"] and f"{pct}%" in r["reply"]
+    assert r["question_type"] == "risk" and r["what_could_change"] and r["confidence"]["score"] > 0
 
 
 def test_llm_invented_number_is_replaced(client, fresh_storm, fake_llm):
@@ -126,7 +151,7 @@ def test_llm_invented_number_is_replaced(client, fresh_storm, fake_llm):
 def test_llm_tool_budget(client, fresh_storm, fake_llm):
     fake_llm += [SimpleNamespace(content="", tool_calls=[_tool_call("get_outage_risk", {}, i)])
                  for i in range(MAX_TOOL_CALLS)]
-    fake_llm += [SimpleNamespace(content="Confirmed by AEP: nothing new.", tool_calls=None)]
+    fake_llm += [SimpleNamespace(content="Nothing new to report.", tool_calls=None)]
     r = chat(client, "Will I lose power?", "llm-budget", premise=DEMO_PREMISE)
     assert len(r["tools_used"]) == MAX_TOOL_CALLS
 
@@ -142,5 +167,13 @@ def test_live_llm_smoke(client, fresh_storm, monkeypatch):
         r = chat(client, "Will I lose power?", f"live-{attempt}", premise=DEMO_PREMISE)
         if r["mode"] == "llm":
             break
+    if r["mode"] != "llm" and "RateLimitError" in (r.get("note") or ""):
+        pytest.skip("LLM provider rate limit reached (free-tier tokens/minute); not a code failure")
     assert r["mode"] == "llm", r.get("note")  # an offline fallback must not pass as a live answer
     assert r["tools_used"] and r["reply"]
+
+
+def test_grounding_reads_unicode_fractions():
+    assert grounded("About 1½ hours.", [{"p50_hrs": 1.5}])[0]
+    ok, bad = grounded("About 2½ hours.", [{"p50_hrs": 1.5}])
+    assert not ok and bad == [2.5]

@@ -164,6 +164,7 @@ class Scenario:
     crew_arrival_delay_hrs: float = 0.0
     extra_damage: dict = field(default_factory=dict)
     access_blocked: bool = False
+    storm_n: float | None = None  # explicit storm size (e.g. from the forecast); overrides storm_severity
 
     @classmethod
     def from_dict(cls, d: dict | None) -> "Scenario":
@@ -183,12 +184,16 @@ class Scenario:
             if job is None:
                 raise ValueError(f"unknown damage type '{k}'; use one of {sorted(set(DAMAGE_KEYS))}")
             extra[job] = extra.get(job, 0) + max(0, int(v))
-        return cls(sev, crews, delay, extra, bool(d.get("access_blocked", False)))
+        storm_n = d.get("storm_n")
+        if storm_n is not None and float(storm_n) < 0:
+            raise ValueError("storm_n cannot be negative")
+        return cls(sev, crews, delay, extra, bool(d.get("access_blocked", False)),
+                   None if storm_n is None else float(storm_n))
 
     def as_dict(self) -> dict:
         return {"storm_severity": self.storm_severity, "crews": self.crews,
                 "crew_arrival_delay_hrs": self.crew_arrival_delay_hrs, "extra_damage": dict(self.extra_damage),
-                "access_blocked": self.access_blocked}
+                "access_blocked": self.access_blocked, "storm_n": self.storm_n}
 
 
 class RestorationEstimator:
@@ -224,7 +229,7 @@ class RestorationEstimator:
     # ---- public --------------------------------------------------------------------------------
 
     def estimate(self, premise: str, scenario: dict | Scenario | None = None, confirmed: dict | None = None,
-                 seed: int = 0, n_runs: int = N_RUNS) -> dict:
+                 seed: int = 0, n_runs: int = N_RUNS, area: tuple | None = None) -> dict:
         sc = scenario if isinstance(scenario, Scenario) else Scenario.from_dict(scenario)
         premise = str(premise).strip()
         if premise not in self.scorer.customers.index:
@@ -236,7 +241,8 @@ class RestorationEstimator:
         if exposure.empty:
             return self._fallback(premise, sc, "There isn't enough network information near this location.")
 
-        jobs = self._job_table(exposure, cust["circuit_key"], sc.storm_severity)
+        storm_n = self.scorer.storm_size(sc.storm_severity, sc.storm_n)
+        jobs = self._job_table(exposure, cust["circuit_key"], storm_n, area)
         confirmed_jobs = {DAMAGE_KEYS.get(str(k).lower(), k): int(v) for k, v in (confirmed or {}).items()}
         sim = self._simulate(jobs, sc, confirmed_jobs, seed, n_runs)
         hops = self._upline_hops(premise)
@@ -244,12 +250,12 @@ class RestorationEstimator:
 
     # ---- internals ----------------------------------------------------------------------------
 
-    def _job_table(self, exposure: pd.DataFrame, circuit_key, severity: str) -> pd.DataFrame:
+    def _job_table(self, exposure: pd.DataFrame, circuit_key, storm_n: float, area: tuple | None = None) -> pd.DataFrame:
         """All assets that can hold up this premise: its exposure set + the rest of its circuit."""
         circuit = self.circuit_assets.get(circuit_key, exposure.iloc[0:0])
         circuit = circuit[~circuit["asset_uid"].isin(exposure["asset_uid"])].assign(component="circuit")
         t = pd.concat([exposure, circuit], ignore_index=True)
-        t["p"] = t[f"p_{severity}"].astype(float)
+        t["p"] = self.scorer.p(t, storm_n, area)
         t["job"] = t["asset_type"].map(lambda a: ASSET_JOB[a][0])
         # The premise's own secondary segment is its service drop.
         own_secondary = (t["component"] == "your_equipment") & (t["asset_type"] == "secondary")
@@ -377,7 +383,8 @@ class RestorationEstimator:
             drivers.append("Uses damage confirmed by field assessment on your line")
 
         assumptions = [
-            f"Storm scenario '{sc.storm_severity}'; damage on your line and circuit is sampled from the outage-risk "
+            f"Storm size: about {self.scorer.storm_size(sc.storm_severity, sc.storm_n):.0f} damage reports across the "
+            "area; damage on your line and circuit is sampled from the outage-risk "
             f"model ({len(sim['total']):,} simulations).",
             "Assumes your power is out; the range is how long until it is back.",
             f"Repair times use AEP STORMS labor hours for each repair's parts (from AEP structure drawings), times "

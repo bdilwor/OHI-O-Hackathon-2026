@@ -11,8 +11,9 @@ An AI assistant that answers a customer's storm questions ("Will I lose power?",
 | Restoration estimator (STORMS labor × AEP structure drawings × Monte Carlo) | ✅ Done |
 | FastAPI tools, privacy filter, audit log, demo storm timeline | ✅ Done |
 | LLM assistant (Groq → Gemini fallback, grounding check, offline mode) | ✅ Done, live-tested with Groq |
-| Tests | ✅ 95 tests (data, model, DB link, restoration, API, privacy, assistant, demo, live LLM) |
-| React frontend | ⏳ Next |
+| Live weather forecast → storm size for the model (Open-Meteo) | ✅ Done |
+| React frontend: forecast-driven 2D/3D map (generic houses, trees, poles, equipment) + chat | ✅ Done |
+| Tests | ✅ 116 backend tests + scripted browser walkthrough |
 
 ## Quick start
 
@@ -38,6 +39,7 @@ You need **Docker Desktop**, with at least 6 GB of memory. You also need the cha
    - loads the data (~1–2 min)
    - publishes the per-asset risk table from the committed model (~30 s)
    - starts the API
+   - installs and starts the web app
 
    Later runs skip the loading and are ready in seconds.
 4. **Check it's up.** The API is ready once `/health` returns `{"ok": true, ...}`:
@@ -46,6 +48,7 @@ You need **Docker Desktop**, with at least 6 GB of memory. You also need the cha
    curl localhost:8000/health
    ```
    Interactive API docs: http://localhost:8000/docs
+5. **Open the app:** http://localhost:5173. Click **try the demo address**, then **Yes, this is my home**.
 
 ## Test it
 
@@ -53,7 +56,7 @@ You need **Docker Desktop**, with at least 6 GB of memory. You also need the cha
 ```bash
 docker compose run --rm ml pytest -q tests
 ```
-Expected: `95 passed`. If no `GROQ_API_KEY` is set, the live-LLM test is reported as skipped. The suite covers:
+Expected: `116 passed`. If no `GROQ_API_KEY` is set, the live-LLM test is reported as skipped. The suite covers:
 - data loading and row counts
 - training quality and no data leakage between storms
 - the model's link to the database
@@ -79,7 +82,42 @@ curl -X POST localhost:8000/chat -H 'content-type: application/json' \
 
 **C. Walk the full demo** (storm timeline, proactive messages, what-ifs, escalation, refusals, fallback): follow [backend/demo/DEMO_SCRIPT.md](backend/demo/DEMO_SCRIPT.md). Add `"demo_safe": true` to any `/chat` call to serve the pre-recorded answers in `backend/demo/cache.json` if the network or the LLM fails during a presentation.
 
-**D. See the controls:** `curl "localhost:8000/audit?limit=10"` shows every tool call, with a masked input, the fields returned and the fields redacted.
+**D. Click through the app** at http://localhost:5173:
+1. Use the demo address.
+2. Look at the 3D map for today's real forecast (usually mostly green), then drag the forecast day slider.
+3. Tick **What if a storm like Feb 2025 hit?** and watch homes, poles and wires turn orange and red.
+4. Tap **Will I lose power?** You get an answer, what could change it, and a confidence meter.
+5. Tap **How long would repairs take?** on a far-out forecast day. Confidence drops below 60%, and the missing data is listed.
+6. Switch between **2D** and **3D**.
+
+**E. See the controls:** `curl "localhost:8000/audit?limit=10"` shows every tool call, with a masked input, the fields returned and the fields redacted.
+
+## Frontend: forecast-driven 2D/3D map + chat
+
+The map is on the left and the chat on the right. Everything on the map is the **outage model's prediction for one day of the live weather forecast** (Open-Meteo, from today through 6 days out). A labeled **"What if a storm like Feb 2025 hit?"** toggle replays a historical-size storm, so you can see the map turn red on a calm week.
+
+| Control | What it does |
+|---|---|
+| **2D / 3D** | 2D: flat homes, equipment and lines. 3D: generic low-poly models (built in code, no model files) |
+| **Forecast day slider** | Today … +6 days; each day's peak gust and conditions set the storm size the model uses |
+| **Feb 2025 replay** | A hypothetical storm the size of the February 2025 event (1,254 damage reports) |
+| **Layers** | Homes · poles, equipment & lines · trees · your supply path |
+
+Colors run from **green (good) to red (bad)**:
+- **Homes:** chance of an outage in that area. Your house is the large one and uses the full premise model.
+- **Trees:** colored like the nearest home. They are placed only inside real OpenStreetMap wooded and park areas from the basemap; the challenge data has no vegetation.
+- **Poles, transformers, fuses, reclosers and wires:** chance that item is damaged. Overhead wires are drawn at pole height in 3D.
+
+The supply path (home → transformer → fuse → reclosers) shows flowing current, and the restoration bottleneck is labeled.
+
+**Chat answers** have three parts:
+1. **A direct answer** from the backend's tools: the live LLM, or the rules-based fallback.
+2. **"What could change this"** with 2–3 items, for outage-chance and repair-time questions.
+3. **One confidence meter.** Below 60%, it lists the 2–3 missing data points that would make the answer more certain.
+
+The chat uses the same day or storm as the map. Confidence is a documented data-support score, not a statistical probability (see [ASSUMPTIONS.md](backend/ml/ASSUMPTIONS.md)).
+
+Run the frontend on its own (outside Docker): `cd frontend && npm install && npm run dev`. It needs Node 18+ and expects the API on :8000.
 
 ## Common tasks
 
@@ -92,12 +130,15 @@ curl -X POST localhost:8000/chat -H 'content-type: application/json' \
 | Regenerate the demo cache (uses the LLM if a key is set) | `docker compose run --rm ml python -m demo.build_cache` |
 | Score one premise from the CLI | `docker compose run --rm ml python -m ml.score 982542862 --severity high` |
 | API logs | `docker compose logs -f api` |
+| Web app logs | `docker compose logs -f web` |
+| Production build of the web app | `cd frontend && npm run build` (outputs `frontend/dist/`) |
 
 ## Troubleshooting
 
 | Problem | Fix |
 |---|---|
-| `port is already allocated` (5432 or 8000) | Set `POSTGRES_PORT=5433` or `API_PORT=8001` in `.env` |
+| `port is already allocated` (5432, 8000 or 5173) | Set `POSTGRES_PORT`, `API_PORT` or `WEB_PORT` in `.env` |
+| The map is blank | WebGL must be enabled in your browser; the basemap needs internet access (CARTO tiles) |
 | The loader exits with an error | Check `data/` has all the files listed above; then run `docker compose logs loader` |
 | `/chat` replies end with "LLM unavailable … answered with the rules-based assistant" | Your key, model name or quota is the problem. Groq retires models: list yours via `https://api.groq.com/openai/v1/models`, then set `GROQ_MODEL` in `.env` |
 | You changed `requirements.txt` | `docker compose build` |
@@ -126,7 +167,7 @@ flowchart LR
   TOOLS --> PRIVACY --> ASSIST
   ASSIST <--> LLM["Groq → Gemini fallback\n(OpenAI-compatible)"]
   STORM --> TOOLS
-  CLIENT["Client (curl now,\nReact frontend next)"] <--> API
+  CLIENT["React web app\n3D risk map + chat\n(docker: web)"] <--> API
 ```
 
 - **Risk:**
@@ -150,7 +191,7 @@ flowchart LR
 | `LLM_PROVIDER` | `groq` | `groq` (falls back to Gemini), `gemini`, or `offline` |
 | `GROQ_API_KEY` / `GROQ_MODEL` | – / `openai/gpt-oss-120b` | Groq free tier |
 | `GEMINI_API_KEY` / `GEMINI_MODEL` | – / `gemini-2.0-flash` | Gemini fallback |
-| `POSTGRES_PORT`, `API_PORT` | `5432`, `8000` | Host ports |
+| `POSTGRES_PORT`, `API_PORT`, `WEB_PORT` | `5432`, `8000`, `5173` | Host ports |
 | `FORCE_RELOAD` | `0` | `1` makes the loader reload all data |
 
 ## API
@@ -164,8 +205,10 @@ flowchart LR
 | `POST /tools/check_alert_eligibility` | Which documented alert rules fire (channel, timing, escalation) |
 | `POST /tools/draft_message` | `pre_storm`, `outage_confirmed`, `estimate_updated`, `restored` SMS (≤320 chars) |
 | `POST /storm/advance` · `/storm/reset` · `GET /storm/state` · `/storm/events` (SSE) · `/storm/messages` | Demo storm timeline and proactive messages |
-| `POST /chat` | `{reply, card: {confirmed, estimate, actions}, tools_used, fallback, mode}` |
+| `POST /chat` | `{reply, question_type, what_could_change, confidence: {score, label, missing}, storm, tools_used, mode}`; send `storm: {mode, day}` to match the map |
 | `GET /audit` | Tool-call audit log |
+| `GET /map/context?premise=&day=` · `&mode=replay&storm=feb2025` | Map payload: homes, poles, equipment, 3D lines, supply path, forecast, your risk |
+| `GET /forecast?premise=` | Live 7-day forecast and the storm size each day implies |
 | `GET /health` | Readiness |
 
 ## Repository layout
@@ -177,9 +220,12 @@ backend/
   restoration.py  labor + Monte Carlo      guidance.py    prep / alert rules / messages
   privacy.py      redaction + audit        assistant.py   LLM middleware
   storm.py        demo timeline            lookup.py      address / map lookup
+  mapdata.py      map payload            forecast.py    live forecast -> storm size
+  confidence.py   confidence score, missing data, what could change the answer
   demo/           scenario.json, DEMO_SCRIPT.md, cache.json, build_cache.py
   tests/          pytest suite
-frontend/         (next)
+frontend/         React app (Vite)
+  src/            RiskMap (deck.gl 2D/3D), meshes.js (generic models), trees.js (OSM trees), ChatPanel, ConfidenceMeter
 ```
 
 ## Known limitations

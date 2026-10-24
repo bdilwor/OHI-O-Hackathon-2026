@@ -3,7 +3,14 @@
     docker compose up -d db
     docker compose run --rm ml pytest -q tests
 """
+import os
+from pathlib import Path
+
 import pytest
+
+# Deterministic weather for every test (never calls the live forecast API): day 0 is a severe storm
+# (72 mph gusts = Feb 2025 storm size), day 1 calm, day 3 thunderstorms, day 6 calm.
+os.environ.setdefault("FORECAST_FIXTURE", str(Path(__file__).resolve().parent / "fixtures" / "forecast.json"))
 from sqlalchemy import inspect, text
 from sqlalchemy.exc import OperationalError
 

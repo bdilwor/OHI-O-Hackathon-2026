@@ -2,6 +2,7 @@
 #   db      PostGIS
 #   loader  loads data/ into Postgres and publishes asset_risk (skips both when already done), then exits
 #   api     FastAPI on http://localhost:8000 (docs at /docs), starts after loader succeeds
+#   web     React frontend on http://localhost:5173 (Vite dev server; proxies /api to the api service)
 #   ml      on demand only: `docker compose run --rm ml` (retrain) / `... ml pytest -q tests` (tests)
 
 x-backend: &backend
@@ -53,7 +54,21 @@ services:
     depends_on:
       loader:
         condition: service_completed_successfully
-    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload --timeout-graceful-shutdown 3  # SSE streams never close on their own
+
+  web:
+    image: node:22-alpine
+    working_dir: /app
+    environment:
+      VITE_API_TARGET: http://api:8000
+    ports:
+      - "${WEB_PORT:-5173}:5173"
+    volumes:
+      - ./frontend:/app
+      - web_node_modules:/app/node_modules  # container's own Linux node_modules (not the host's)
+    depends_on:
+      - api
+    command: sh -c "npm ci --no-audit --no-fund && npm run dev -- --host 0.0.0.0 --port 5173"
 
   ml:
     <<: *backend
@@ -67,3 +82,4 @@ services:
 
 volumes:
   pgdata:
+  web_node_modules:

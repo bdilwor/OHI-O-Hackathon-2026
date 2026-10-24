@@ -29,6 +29,7 @@ BANDS = [(0.05, "Low"), (0.20, "Medium"), (0.50, "High"), (1.01, "Very High")]
 CONF_HIGH_MIN_RECORDS = 20
 CONF_MEDIUM_MIN_RECORDS = 5
 FACTOR_RANK_WEIGHTS = (1.0, 0.6, 0.3)
+P_CAP = 0.95
 
 
 def str_columns(cols: list[str]) -> dict:
@@ -49,6 +50,38 @@ def build_topology_graph(hops: pd.DataFrame) -> nx.DiGraph:
     return g
 
 
+def p_at(df: pd.DataFrame, storm_n: float, anchors: list[tuple[float, str]]) -> np.ndarray:
+    """P(damage) for any storm size, from the stored anchor columns (p_low/p_medium/p_high).
+
+    Log-log interpolation between anchors (damage scales roughly as a power of storm size);
+    linear below the smallest anchor, proportional above the largest (capped). Reproduces the
+    stored anchors exactly.
+    """
+    n = max(float(storm_n), 1e-6)
+    (n0, c0), (n1, c1), (n2, c2) = anchors
+    if n <= n0:
+        return df[c0].to_numpy(dtype=float) * (n / n0)
+    if n >= n2:
+        return np.minimum(df[c2].to_numpy(dtype=float) * (n / n2), P_CAP)
+    (na, ca), (nb, cb) = ((n0, c0), (n1, c1)) if n <= n1 else ((n1, c1), (n2, c2))
+    t = (np.log(n) - np.log(na)) / (np.log(nb) - np.log(na))
+    pa = np.clip(df[ca].to_numpy(dtype=float), 1e-9, None)
+    pb = np.clip(df[cb].to_numpy(dtype=float), 1e-9, None)
+    return np.exp(np.log(pa) + t * (np.log(pb) - np.log(pa)))
+
+
+def p_area(df: pd.DataFrame, storm_n: float, anchors: list[tuple[float, str]], area: tuple | None) -> np.ndarray:
+    """P(damage) when the storm only covers a circle: area = (cx, cy, radius_m, calm_n) in EPSG:32617 metres.
+
+    Equipment inside the circle sees the storm; equipment outside sees calm weather.
+    """
+    if area is None:
+        return p_at(df, storm_n, anchors)
+    cx, cy, r, calm_n = area
+    inside = np.hypot(df["x"].to_numpy(dtype=float) - cx, df["y"].to_numpy(dtype=float) - cy) <= r
+    return np.where(inside, p_at(df, storm_n, anchors), p_at(df, calm_n, anchors))
+
+
 def risk_band(p: float) -> str:
     return next(label for upper, label in BANDS if p < upper)
 
@@ -58,6 +91,7 @@ class PremiseScorer:
         engine = engine or get_engine()
         self.bundle = load_bundle()
         self.levels = self.bundle["severity_levels"]
+        self.anchors = sorted((v["n_records"], f"p_{k}") for k, v in self.levels.items())
 
         factor_cols = ", ".join(f"factor_{k}, factor_{k}_value" for k in (1, 2, 3))
         self.assets = read_frame(
@@ -99,9 +133,23 @@ class PremiseScorer:
 
     # ---- public API -------------------------------------------------------------------------
 
-    def score(self, premise: str, severity: str = "medium") -> dict:
+    def storm_size(self, severity: str | None = None, storm_n: float | None = None) -> float:
+        """Storm size (expected area damage reports) from an explicit value or a named scenario."""
+        if storm_n is not None:
+            if storm_n < 0:
+                raise ValueError("storm_n cannot be negative")
+            return float(storm_n)
         if severity not in self.levels:
             raise ValueError(f"severity must be one of {list(self.levels)}")
+        return float(self.levels[severity]["n_records"])
+
+    def p(self, df: pd.DataFrame, storm_n: float, area: tuple | None = None) -> np.ndarray:
+        return p_area(df, storm_n, self.anchors, area)
+
+    def score(self, premise: str, severity: str | None = "medium", storm_n: float | None = None,
+              scenario_note: str | None = None, area: tuple | None = None) -> dict:
+        storm_n = self.storm_size(severity, storm_n)
+        severity = severity if storm_n == self.levels.get(severity, {}).get("n_records") else "custom"
         premise = str(premise).strip()
         if premise not in self.customers.index:
             return self._fallback(premise, severity, "We couldn't find this service location in our records.")
@@ -110,7 +158,7 @@ class PremiseScorer:
         parts = self.exposure(premise, cust, in_topology)
         if not any(len(df) for df in parts.values()):
             return self._fallback(premise, severity, "There isn't enough network information near this location.")
-        return self._result(premise, cust, severity, parts, in_topology)
+        return self._result(premise, cust, severity, storm_n, parts, in_topology, scenario_note, area)
 
     def score_location(self, lat: float, lon: float, severity: str = "medium") -> dict:
         x, y = self.to_metric.transform(lon, lat)
@@ -148,8 +196,9 @@ class PremiseScorer:
         main = main[~main["asset_uid"].isin(seen)]
         return {"your_equipment": own, "nearby": near, "main_line": main}
 
-    def _result(self, premise, cust, severity, parts, in_topology) -> dict:
-        col = f"p_{severity}"
+    def _result(self, premise, cust, severity, storm_n, parts, in_topology, scenario_note, area=None) -> dict:
+        parts = {k: df.assign(p=self.p(df, storm_n, area)) for k, df in parts.items()}
+        col = "p"
         survive = {k: float(np.prod(1 - df[col].to_numpy())) for k, df in parts.items()}
         prob = 1 - float(np.prod(list(survive.values())))
         comp_risk = {k: 1 - s for k, s in survive.items()}
@@ -172,10 +221,13 @@ class PremiseScorer:
         n_nearby = len(self.arcos_tree.query_ball_point([cust["x"], cust["y"]], HISTORY_RADIUS_M))
         factors.append(explain.history_sentence(n_nearby))
 
-        level = self.levels[severity]
+        scenario = scenario_note or (
+            f"Storm scenario '{severity}' is modeled on {self.levels[severity]['reference']}."
+            if severity in self.levels else f"Storm size: about {storm_n:.0f} damage reports expected across the area.")
         return {
             "premise": premise,
             "severity": severity,
+            "storm_n": round(storm_n, 2),
             "risk_band": risk_band(prob),
             "probability": round(prob, 3),
             "confidence": confidence,
@@ -183,7 +235,7 @@ class PremiseScorer:
             "top_factors": factors,
             "risk_breakdown": {k: round(v, 3) for k, v in comp_risk.items()},
             "assumptions": [
-                f"Storm scenario '{severity}' is modeled on {level['reference']}; no live weather forecast is used.",
+                scenario,
                 f"Based on {self.n_arcos:,} damage records from past storms in this area (2022-2026).",
                 "Counts damage to equipment on your supply path, lines and poles within about 250 m, and the main "
                 "line feeding your neighborhood; equipment failures are treated as independent.",

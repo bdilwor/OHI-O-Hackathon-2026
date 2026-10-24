@@ -16,12 +16,28 @@ from demo.script import BEATS, DEMO_DIR, SESSION
 PAUSE_S = 3  # stay under free-tier tokens-per-minute limits when a live LLM is configured
 
 
+# What the web app sends: its suggestion chips plus the key demo beats, for each storm setting a judge will use.
+UI_QUESTIONS = ["Will I lose power?", "How long would repairs take?", "What should I do to prepare?",
+                "What if crews are delayed until tomorrow?", "Do I qualify for outage alerts?",
+                "I use an oxygen concentrator", "Where are the crews right now?"]
+UI_STORMS = [{"mode": "replay", "storm": "feb2025"}, {"mode": "forecast", "day": 0}]
+
+
 def run() -> dict:
     cache = {}
     with TestClient(main.app) as c:
         assistant = main.STATE["assistant"]
         premise = main.STATE["storm"].config["premise"]
-        for beat in BEATS:
+        c.post("/storm/reset")
+        for storm in UI_STORMS:
+            session = f"cache-{storm['mode']}"
+            for q in UI_QUESTIONS:
+                r = c.post("/chat", json={"message": q, "session_id": session, "premise": premise,
+                                          "storm": storm}).json()
+                time.sleep(PAUSE_S)
+                cache[assistant.cache_key(q, storm)] = r
+                print(f"[{r['mode']}] {storm['mode']}: {q} -> confidence {(r.get('confidence') or {}).get('score')}")
+        for beat in BEATS:  # the API demo timeline (curl walkthrough)
             for action in beat["storm"]:
                 c.post(f"/storm/{action}")
             if not beat["message"]:
