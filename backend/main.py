@@ -16,11 +16,13 @@ from pydantic import BaseModel, Field
 
 from lookup import Lookup
 from mapdata import MapData
+from ops import OpsService
 from outages import CAUSES, OutageService
 from ml.db import get_engine
 from ml.score import PremiseScorer
 from forecast import ForecastService
 from privacy import default_audit_log
+from regional import RegionalService, is_regional
 from restoration import RestorationEstimator
 from storm import StormTimeline
 from tools import ToolBox
@@ -43,6 +45,8 @@ def build_state() -> dict:
              "map": MapData(engine, scorer)}
     state["outages"] = OutageService(engine, scorer, estimator, state["map"], storm)
     toolbox.outages = state["outages"]
+    state["regional"] = toolbox.regional = RegionalService(engine, scorer, estimator)
+    state["ops"] = OpsService(engine, scorer, estimator)
     print(f"Startup complete in {time.time() - t0:.1f}s")
     return state
 
@@ -119,6 +123,7 @@ class ChatRequest(BaseModel):
     demo_safe: bool = False
     storm: StormContext | None = None
     outage: OutageTest | None = None
+    audience: str = Field("customer", pattern="^(customer|operations)$")  # chat voice: customer or AEP staff
 
 
 def run_tool(name: str, args: dict) -> dict:
@@ -148,6 +153,18 @@ def lookup(address: str | None = None, lat: float | None = Query(None, ge=-90, l
     return result
 
 
+@app.get("/regional/locate")
+def regional_locate(address: str | None = Query(None, min_length=3, max_length=200),
+                    lat: float | None = Query(None, ge=-90, le=90), lon: float | None = Query(None, ge=-180, le=180)):
+    """A regional-estimate location for a place outside AEP's data (geocoded city/state, or a map point)."""
+    if not address and (lat is None or lon is None):
+        raise HTTPException(422, "Provide ?address= or ?lat=&lon=")
+    result = STATE["regional"].locate(address=address, lat=lat, lon=lon)
+    STATE["audit"].record("regional_locate", {"address": bool(address), "point": lat is not None}, result, [],
+                          source="api")
+    return result
+
+
 # ---- map ----
 
 @app.get("/map/context")
@@ -169,13 +186,17 @@ def map_context(premise: str, mode: str = Query("forecast", pattern="^(forecast|
     except ValueError as e:
         raise HTTPException(422, str(e)) from e
     risk = tools.get_outage_risk(premise, storm=ctx)
-    payload = STATE["map"].context(premise, st["storm_n"], risk.get("probability"), area=st.get("area"))
+    if is_regional(premise):  # outside AEP's data: basemap + home marker only, no equipment
+        payload = STATE["regional"].map_payload(premise, risk.get("probability"))
+    else:
+        payload = STATE["map"].context(premise, st["storm_n"], risk.get("probability"), area=st.get("area"))
     if payload is None:
         raise HTTPException(404, "We couldn't find this service location in our records.")
     lat, lon = tools.latlon(premise)
     payload["storm"] = tools._storm_public(st)
     payload["forecast"] = tools.forecast.forecast(lat, lon)
-    payload["your_risk"] = {k: risk.get(k) for k in ("risk_band", "probability", "confidence_meter")}
+    payload["your_risk"] = {k: risk.get(k) for k in ("risk_band", "probability", "confidence_meter", "scope",
+                                                     "probability_range")}
     est = tools.estimate_restoration(premise, storm=ctx)
     payload["restoration"] = {k: est.get(k) for k in ("p10_hrs", "p50_hrs", "p90_hrs", "bottleneck_device")}
     payload["demo_home"] = STATE["storm"].applies_to(premise)  # real outage events (SSE) are for this home only
@@ -183,6 +204,25 @@ def map_context(premise: str, mode: str = Query("forecast", pattern="^(forecast|
                           {k: v for k, v in payload.items() if k != "home"}, [],
                           source="sandbox" if mode == "sandbox" else "api")
     return payload
+
+
+# ---- AEP operations (internal) ----
+
+@app.get("/ops/overview")
+def ops_overview(mode: str = Query("forecast", pattern="^(forecast|sandbox)$"), day: int = Query(0, ge=0, le=6),
+                 intensity: int = Query(3, ge=1, le=5), duration_days: int = Query(1, ge=1, le=5),
+                 crews: int | None = Query(None, ge=1, le=200)):
+    """Area-wide storm impact for AEP staff: KPIs, riskiest circuits, priority facilities. Read-only."""
+    tools = STATE["tools"]
+    ctx = ({"mode": "sandbox", "intensity": intensity, "duration_days": duration_days} if mode == "sandbox"
+           else {"mode": "forecast", "day": day})
+    st = tools.resolve_storm(None, ctx)
+    if mode == "sandbox":  # area-wide, not centered on a home
+        st["summary"] = (f"a simulated category {intensity} storm ({st['label'].lower()}) lasting {duration_days} "
+                         f"day{'s' if duration_days > 1 else ''} across the service area")
+    out = STATE["ops"].overview(tools._storm_public(st), crews)
+    STATE["audit"].record("ops_overview", ctx, {"kpis": out["kpis"]}, [], source="ops")
+    return out
 
 
 # ---- outages ----
@@ -331,7 +371,8 @@ def chat(req: ChatRequest):
         return STATE["assistant"].chat(req.message, session_id=req.session_id, premise=req.premise,
                                        declared_needs=req.declared_needs, demo_safe=req.demo_safe,
                                        storm=req.storm.model_dump() if req.storm else None,
-                                       outage=req.outage.model_dump() if req.outage else None)
+                                       outage=req.outage.model_dump() if req.outage else None,
+                                       audience=req.audience)
     except ValueError as e:
         raise HTTPException(422, str(e)) from e
 

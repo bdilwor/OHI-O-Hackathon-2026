@@ -9,6 +9,7 @@ from sqlalchemy import text
 
 import confidence
 import guidance
+import regional
 from forecast import ForecastService, storm_label
 from ml.db import METRIC_CRS
 from privacy import AuditLog, redact
@@ -38,12 +39,16 @@ class ToolBox:
         self.audit = audit
         self.forecast = forecast or ForecastService(scorer.levels)
         self.outages = None  # OutageService, attached at startup (main.build_state)
+        self.regional = None  # RegionalService for locations outside the data, attached at startup
         self.to_wgs = Transformer.from_crs(METRIC_CRS, 4326, always_xy=True)
         self._cache: dict = {}
 
     # ---- storm context: live forecast (default), replay, or a named model scenario ----
 
     def latlon(self, premise: str | None) -> tuple[float, float]:
+        if regional.is_regional(premise):
+            lat, lon, _ = regional.parse_key(premise)
+            return lat, lon
         if premise is None or premise not in self.scorer.customers.index:
             return SERVICE_AREA_CENTER
         c = self.scorer.customers.loc[premise]
@@ -88,6 +93,8 @@ class ToolBox:
         return self.forecast.resolve(storm, lat, lon, pick_worst=pick_worst)
 
     def _support(self, premise: str) -> dict:
+        if regional.is_regional(premise):
+            return {"circuit_records": 0, "in_topology": False}
         cust = self.scorer.customers.loc[premise]
         return {"circuit_records": int(self.scorer.circuit_records.get(cust["circuit_key"], 0)),
                 "in_topology": self.scorer.graph.has_node(("premise", premise))}
@@ -102,6 +109,12 @@ class ToolBox:
 
     def get_outage_risk(self, premise: str, severity: str | None = None, storm: dict | None = None) -> dict:
         st = self.resolve_storm(premise, storm, severity)
+        if regional.is_regional(premise):
+            risk = self.regional.risk(premise, st, self.scorer.bundle["model_version"])
+            risk["storm"] = self._storm_public(st)
+            risk["confidence_meter"] = confidence.assess("risk", storm=st, regional=True, **self._support(premise))
+            risk["what_could_change"] = confidence.risk_changers(risk, st)
+            return risk
         risk = self._memo(("risk", premise, st["storm_n"], st["summary"], st.get("area")),
                           lambda: self.scorer.score(premise, None, storm_n=st["storm_n"], area=st.get("area"),
                                                     scenario_note=f"Storm: {st['summary']}."))
@@ -117,6 +130,13 @@ class ToolBox:
         # What-if fields override the demo timeline's crews/delay (or the sandbox sliders); storm size comes
         # from the storm context. The sandbox never uses the demo timeline's confirmed damage.
         sandbox = st.get("mode") == "sandbox"
+        if regional.is_regional(premise):
+            base = ({"crews": st["crews"], "crew_arrival_delay_hrs": st["crew_arrival_delay_hrs"]} if sandbox else {})
+            est = self.regional.restoration(premise, st, {**base, **scenario})
+            est["storm"] = self._storm_public(st)
+            est["confidence_meter"] = confidence.assess("restoration", storm=st, regional=True, **self._support(premise))
+            est["what_could_change"] = confidence.restoration_changers(est)
+            return est
         base = ({"crews": st["crews"], "crew_arrival_delay_hrs": st["crew_arrival_delay_hrs"]} if sandbox
                 else self.storm.scenario())
         merged = {**base, **scenario, "storm_n": st["storm_n"]}
@@ -185,6 +205,8 @@ class ToolBox:
 
     def _registry_flag(self, premise: str) -> bool:
         """Internal life-support registry flag: backend-only (escalation priority), never returned."""
+        if regional.is_regional(premise):
+            return False
         with self.engine.connect() as conn:
             v = conn.execute(text("SELECT critical_c FROM customer_private WHERE premise_nu = :p LIMIT 1"),
                              {"p": premise}).scalar()

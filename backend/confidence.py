@@ -14,14 +14,19 @@ def _label(score: float) -> str:
 
 
 def assess(kind: str, *, circuit_records: int, in_topology: bool, storm: dict,
-           damage_assessed: bool = False) -> dict:
-    """kind: 'risk' or 'restoration'."""
+           damage_assessed: bool = False, regional: bool = False) -> dict:
+    """kind: 'risk' or 'restoration'. regional: a location outside AEP's data (a regional typical value)."""
     gaps = []  # (penalty, missing data point)
+    if regional:
+        gaps.append((0.35, "the local grid map for this location (it is outside AEP's data)"))
     if circuit_records < 5:
-        gaps.append((0.30, "past storm damage records for the line that serves you"))
+        gaps.append((0.30, "local storm history for this area" if regional
+                     else "past storm damage records for the line that serves you"))
     elif circuit_records < 20:
         gaps.append((0.15, "more past storm records for the line that serves you"))
-    if not in_topology:
+    if regional:
+        gaps.append((0.15, "which utility serves this location"))
+    elif not in_topology:
         gaps.append((0.15, "your home's exact connection in the grid map"))
     if not storm.get("forecast_available", True):
         gaps.append((0.25, "a live weather forecast"))

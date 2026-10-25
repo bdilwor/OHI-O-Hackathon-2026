@@ -14,5 +14,19 @@ export default defineConfig({
     },
   },
   worker: { format: 'es' }, // MapLibre's worker is an ES module
-  build: { chunkSizeWarningLimit: 2500 },
+  build: {
+    // Split the big map libraries into their own cacheable chunks; the views that use them load lazily.
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (!id.includes('node_modules')) return undefined;
+          if (id.includes('maplibre-gl')) return 'maplibre';
+          if (id.includes('@deck.gl') || id.includes('@luma.gl') || id.includes('@loaders.gl') || id.includes('@math.gl')) return 'deckgl';
+          if (id.includes('react')) return 'react';
+          return 'vendor';
+        },
+      },
+    },
+    chunkSizeWarningLimit: 1200,  // MapLibre alone is ~1.1 MB minified and cannot be split further
+  },
 });

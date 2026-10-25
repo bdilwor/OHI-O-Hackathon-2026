@@ -1,0 +1,8 @@
+# Research-only image for the neural-operator (FNO) feasibility test. Not used by the app.
+#   docker compose --profile research run --rm research
+FROM python:3.12-slim
+ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1
+WORKDIR /app
+COPY requirements.txt /tmp/requirements.txt
+RUN pip install --no-cache-dir -r /tmp/requirements.txt
+CMD ["python", "-m", "research.fno_experiment"]

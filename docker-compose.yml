@@ -4,6 +4,7 @@
 #   api     FastAPI on http://localhost:8000 (docs at /docs), starts after loader succeeds
 #   web     React frontend on http://localhost:5173 (Vite dev server; proxies /api to the api service)
 #   ml      on demand only: `docker compose run --rm ml` (retrain) / `... ml pytest -q tests` (tests)
+#   research  on demand only: `docker compose --profile research run --rm research` (FNO feasibility test)
 
 x-backend: &backend
   build: ./backend
@@ -79,6 +80,14 @@ services:
       db:
         condition: service_healthy
     command: sh -c "python -m ml.build_dataset && python -m ml.train && python -m ml.duration && python -m ml.score_assets"
+
+  research:  # neural-operator feasibility test only (torch + neuraloperator); not part of the app
+    build:
+      context: ./backend/research
+      dockerfile: Dockerfile.research
+    profiles: ["research"]
+    volumes:
+      - ./backend:/app
 
 volumes:
   pgdata:

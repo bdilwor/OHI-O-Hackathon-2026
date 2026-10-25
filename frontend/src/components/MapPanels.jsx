@@ -2,18 +2,14 @@ import { LAYERS } from './RiskMap.jsx';
 
 const LABEL_DOT = { Calm: '#2ecc8f', Breezy: '#c6d84a', Windy: '#f5a524', Storm: '#f2711c', 'Severe storm': '#f05252' };
 
-export function MapControls({ viewMode, onViewMode, storm, onStorm, forecast, layersOn, onToggle, loading,
+export function MapControls({ viewMode, onViewMode, theme, onTheme, storm, onStorm, forecast, layersOn, onToggle, loading,
                              showForecast = true }) {
   const days = showForecast ? forecast?.days || [] : [];
   const day = days[storm?.day ?? 0];
   return (
     <section className="panel layers-panel" aria-label="Map controls">
       <h3>View {loading && <span className="conf">updating…</span>}</h3>
-      <div className="segmented two" role="group" aria-label="Map view">
-        {['2d', '3d'].map((m) => (
-          <button key={m} type="button" aria-pressed={viewMode === m} onClick={() => onViewMode(m)}>{m.toUpperCase()}</button>
-        ))}
-      </div>
+      <ViewToggle viewMode={viewMode} onViewMode={onViewMode} theme={theme} onTheme={onTheme} />
 
       {showForecast && <h3 style={{ marginTop: 12 }}>Weather forecast <span className="tag model">live</span></h3>}
       {showForecast && forecast && !forecast.available && <p className="legend-note">Live forecast unavailable; assuming calm weather.</p>}
@@ -48,6 +44,26 @@ export function MapControls({ viewMode, onViewMode, storm, onStorm, forecast, la
         </label>
       ))}
     </section>
+  );
+}
+
+/** 2D/3D view and light/dark basemap, shared by every map. */
+export function ViewToggle({ viewMode, onViewMode, theme, onTheme }) {
+  return (
+    <div className="view-toggle">
+      <div className="segmented two" role="group" aria-label="Map view">
+        {['2d', '3d'].map((m) => (
+          <button key={m} type="button" aria-pressed={viewMode === m} onClick={() => onViewMode(m)}>{m.toUpperCase()}</button>
+        ))}
+      </div>
+      {onTheme && (
+        <div className="segmented two" role="group" aria-label="Map theme">
+          {[['light', '☀ Light'], ['dark', '☾ Dark']].map(([t, label]) => (
+            <button key={t} type="button" aria-pressed={theme === t} onClick={() => onTheme(t)}>{label}</button>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
 

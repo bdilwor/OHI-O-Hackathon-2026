@@ -1,0 +1,116 @@
+{
+  "folds": {
+    "minor_events": {
+      "fno": {
+        "poisson_deviance": 33367.5,
+        "cell_pr_auc": 0.00473109999845964,
+        "cell_roc_auc": 0.8150557572848357,
+        "predicted_total": 16631.56640625,
+        "actual_total": 158.0
+      },
+      "production_lr": {
+        "poisson_deviance": 9695.2138671875,
+        "cell_pr_auc": 0.007133657913507764,
+        "cell_roc_auc": 0.8326085273418447,
+        "predicted_total": 4587.4609375,
+        "actual_total": 158.0
+      },
+      "uniform_by_storm_size": {
+        "poisson_deviance": 1765.4395734661834,
+        "cell_pr_auc": 0.016662706811244536,
+        "cell_roc_auc": 0.8739562767914978,
+        "predicted_total": 155.1,
+        "actual_total": 158.0
+      }
+    },
+    "storm_2024-09": {
+      "fno": {
+        "poisson_deviance": 1475.7744140625,
+        "cell_pr_auc": 0.10074196155501039,
+        "cell_roc_auc": 0.7506992921351066,
+        "predicted_total": 43.59230041503906,
+        "actual_total": 190.0
+      },
+      "production_lr": {
+        "poisson_deviance": 1764.6328125,
+        "cell_pr_auc": 0.17281278127506935,
+        "cell_roc_auc": 0.8303916525828496,
+        "predicted_total": 10.877533912658691,
+        "actual_total": 190.0
+      },
+      "uniform_by_storm_size": {
+        "poisson_deviance": 1055.6241416569483,
+        "cell_pr_auc": 0.17132707598733946,
+        "cell_roc_auc": 0.8223455066500112,
+        "predicted_total": 182.35999999999999,
+        "actual_total": 190.0
+      }
+    },
+    "storm_2025-01": {
+      "fno": {
+        "poisson_deviance": 354.96502685546875,
+        "cell_pr_auc": 0.057287884462990435,
+        "cell_roc_auc": 0.7887063351095324,
+        "predicted_total": 49.502750396728516,
+        "actual_total": 46.0
+      },
+      "production_lr": {
+        "poisson_deviance": 366.98577880859375,
+        "cell_pr_auc": 0.09982436150620841,
+        "cell_roc_auc": 0.8664890467732386,
+        "predicted_total": 12.219084739685059,
+        "actual_total": 46.0
+      },
+      "uniform_by_storm_size": {
+        "poisson_deviance": 314.9847230629317,
+        "cell_pr_auc": 0.09926981573218033,
+        "cell_roc_auc": 0.864854697059404,
+        "predicted_total": 43.239999999999995,
+        "actual_total": 46.0
+      }
+    },
+    "storm_2025-02": {
+      "fno": {
+        "poisson_deviance": 13802.5419921875,
+        "cell_pr_auc": 0.2105965114270923,
+        "cell_roc_auc": 0.5517063116410535,
+        "predicted_total": 13.686697959899902,
+        "actual_total": 1169.0
+      },
+      "production_lr": {
+        "poisson_deviance": 3971.295654296875,
+        "cell_pr_auc": 0.4169871277480886,
+        "cell_roc_auc": 0.8337798008687654,
+        "predicted_total": 852.8123779296875,
+        "actual_total": 1169.0
+      },
+      "uniform_by_storm_size": {
+        "poisson_deviance": 4507.612766402028,
+        "cell_pr_auc": 0.37605753842372075,
+        "cell_roc_auc": 0.7986975232800928,
+        "predicted_total": 1178.76,
+        "actual_total": 1169.0
+      }
+    }
+  },
+  "mean": {
+    "fno": {
+      "poisson_deviance": 12250.195358276367,
+      "cell_pr_auc": 0.09333936436088819,
+      "cell_roc_auc": 0.7265419240426321
+    },
+    "production_lr": {
+      "poisson_deviance": 3949.532028198242,
+      "cell_pr_auc": 0.17418948211071855,
+      "cell_roc_auc": 0.8408172568916745
+    },
+    "uniform_by_storm_size": {
+      "poisson_deviance": 1910.9153011470228,
+      "cell_pr_auc": 0.16582928423862126,
+      "cell_roc_auc": 0.8399635009452515
+    }
+  },
+  "fno_wins": false,
+  "markdown": "Grid 64x64 (~943 m cells), 35 storms, 400 epochs, Poisson loss with an asset-count offset, rotation/flip augmentation. Truth = damaged assets per cell (same as the baseline's test labels). Cells without assets are excluded.\n\n| Model (mean over folds) | Cell PR-AUC | Cell ROC-AUC | Poisson deviance |\n|---|---|---|---|\n| fno | 0.093 | 0.727 | 12250 |\n| production_lr | 0.174 | 0.841 | 3950 |\n| uniform_by_storm_size | 0.166 | 0.840 | 1911 |\n\n| Held-out storm | FNO PR-AUC | Production PR-AUC | Uniform PR-AUC |\n|---|---|---|---|\n| minor_events | 0.005 | 0.007 | 0.017 |\n| storm_2024-09 | 0.101 | 0.173 | 0.171 |\n| storm_2025-01 | 0.057 | 0.100 | 0.099 |\n| storm_2025-02 | 0.211 | 0.417 | 0.376 |\n\n**Verdict:** the FNO does not beat the production asset-level model, so it is not adopted. With one sample per storm (35, three of them major), a field-to-field operator has far too few training examples, and the asset attributes that drive damage (age, material, height, history) are blurred away when rasterized.",
+  "seconds": 4967
+}

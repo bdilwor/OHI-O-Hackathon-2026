@@ -23,8 +23,11 @@ venv/
 htmlcov/
 
 # ML: intermediate datasets are rebuilt by `docker compose run --rm ml`.
-# Committed on purpose: trained models (*.joblib), metrics, plots, ASSUMPTIONS.md, demo/cache.json.
+# Committed on purpose: trained models (*.joblib), metrics, plots, ASSUMPTIONS.md, demo/cache.json,
+# BENCHMARK.md and the small JSON results (hazard curve, regional profile, FNO test).
 backend/ml/artifacts/*.parquet
+# ...except the historical-weather cache (small; lets the gust curve and benchmark rebuild offline)
+!backend/ml/artifacts/weather.parquet
 
 # Runtime logs (incl. the API audit log, backend/logs/audit.jsonl)
 backend/logs/

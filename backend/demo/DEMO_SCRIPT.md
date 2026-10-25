@@ -2,23 +2,26 @@
 
 ## In the browser (http://localhost:5173)
 
+Two portals (top left): **Customer** and **AEP Operations**. The judging story is: the customer gets a personal, friendly answer; AEP staff see the whole area and get a professional briefing from the same model.
+
 | # | Beat | What to do | What judges see |
 |---|---|---|---|
 | 0 | Find the home | **try the demo address** → **Yes, this is my home** | Colorful 3D neighborhood: houses with lit windows, trees, poles, sagging wires; supply path with flowing current |
-| 1 | Live forecast (**My home**) | Drag the forecast day slider; ask "Will I lose power?" | Real forecast drives the model; answer + "what could change this" + confidence meter |
-| 2 | Switch to **Storm test** | Click the Storm test tab | Storm sliders; everything simulated, nothing saved |
-| 3 | Big storm | Intensity slider → 5 | Rain, houses turn orange/red, windows go dark with red rings; notifications "Outage likely at your home", "Repair estimate longer" (each fades after ~4 s) |
-| 4 | Crews and duration | Crews → 20, then duration → 3 days | Repair estimate shortens, then lengthens (toasts + readout) |
-| 5 | Affected area | Shrink the area to 300 m (toggle m/yd) | Only the nearby circle stays red; the rest calms down |
-| 6 | Play storm | **▶ Play storm** | The storm ramps up and down over ~15 s, firing notifications |
-| 7 | Switch to **Outage test** | Click the Outage test tab; cause "Tree on the power line"; **Start outage** | Red affected-area polygon + fault pin; outage panel: where, ~N homes / km² / streets, reported and estimated fix (e.g. "Sun, 25 Oct 2026, 1:18 am"), why it takes ~X h; toast + proactive chat message |
-| 8 | Move the fault | Pick the recloser in "Where is the fault?", then click a pole elsewhere on the map | The affected area grows with the recloser; a clicked pole on another branch may leave your home unaffected |
-| 9 | Chat reacts | Ask "How long until my power is back?" · drag crews | Answer uses the outage's dates; more crews → earlier fix ("Estimated fix time updated") |
-| 10 | Restore | **Restore power** | "Power restored" toast; the supply path turns green |
-| 11 | Refusal / medical | "Where are the crews right now?" · "I use an oxygen concentrator" | Polite refusal; tailored safety steps + callback eligibility |
-| 12 | 2D / 3D | Toggle **2D** | Flat map of the same prediction |
+| 1 | Live forecast (**My home**) | Drag the forecast day slider; ask "Will I lose power?" | Real forecast drives the model; a friendly answer + "what could change this" + confidence meter |
+| 2 | My plan | Open **My plan**; tap *Powered medical device* in the chat | Labeled EMERGENCY / SAFETY / PREPARE steps update; alert eligibility (pre-storm SMS + check-in call) |
+| 3 | Outside AEP's area | **Change** → search "Columbus, Ohio" → **Get a regional estimate** | Regional estimate from the live forecast there and similar AEP-area homes, Low confidence, and an honest "outside AEP's data" note |
+| 4 | **How it works** | Click the tab | Pipeline, metrics, questions we asked, what didn't work (incl. the FNO and physics tests), 10x scale |
+| 5 | **AEP Operations → Operations** | Switch portal; **Storm** tab → **Simulated storm**, intensity → 5; area crews 300 | KPIs jump (expected damage, customers out, high-risk circuits, crew-hours, crews for 24/72 h, facilities at risk); circuit risk map; hospitals / fire / ambulance with suggested actions; a "Priority facilities" toast; SMS previews + alert rules |
+| 6 | 3D + dark | Map **3D**, then **☾ Dark** | Circuits become columns sized by expected damage; the basemap goes dark on every map |
+| 7 | **Test a home** | **Test a home →** (the demo home is already chosen) | Flies into the home: rain, houses orange/red, windows dark with red rings, under the same storm |
+| 8 | Two voices | **Chat** tab: "What is the outage risk for this premise?" | A concise professional briefing, same numbers as the customer's answer in beat 1 |
+| 9 | Crews, duration, area | **Storm** tab: crews → 20, duration → 3 days, area → 300 m; **▶ Play storm** | Repair estimate moves; only the nearby circle stays red; the storm ramps up and down |
+| 10 | **Outage test** tab | Cause "Tree on the power line"; **Start outage** | Red affected-area polygon + fault pin; outage panel: where, ~N homes / km² / streets, reported and estimated fix (day, month, year), why it takes ~X h |
+| 11 | Move the fault | Pick the recloser, then click a pole elsewhere on the map | The affected area grows with the recloser; a pole on another branch may leave the home unaffected |
+| 12 | Chat + restore | Ask "How long would restoration take?"; drag crews; **Restore power**; **← Back to area** | Briefing uses the outage's dates; more crews → earlier fix; "Power restored" toast, path turns green |
+| 13 | Refusal / medical | "Where are the crews right now?" · "I use an oxygen concentrator" | Polite refusal; tailored safety steps + callback eligibility |
 
-**Point out:** the 🔔 notification history, the **Privacy & audit log** (Storm test calls are tagged `sandbox`, Outage test calls `outage_test`), and **Demo-safe mode**.
+**Point out:** the 🔔 notification history, the **Privacy & audit log** (simulated-storm calls are tagged `sandbox`, outage-test calls `outage_test`, area calls `ops`), and switching tabs is instant, and **Demo-safe mode**.
 
 **Real outage feed on My home:** `curl -X POST localhost:8000/storm/advance` (the outage is confirmed on the next beat; `/storm/reset` clears it). The outage panel appears on **My home** with the timeline's damage and crews.
 
