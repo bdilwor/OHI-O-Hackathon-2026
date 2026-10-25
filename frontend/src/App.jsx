@@ -14,15 +14,16 @@ const STATUS_DOT = { Calm: 'ok', Breezy: 'ok', Windy: 'live', Storm: 'out', 'Sev
 const rid = () => Math.random().toString(36).slice(2, 10);
 const PORTALS = {
   customer: { label: 'Customer', home: '#/', tabs: [['home', '#/', 'My home'], ['about', '#/about', 'How it works']] },
-  ops: { label: 'AEP Operations', home: '#/ops', tabs: [['ops', '#/ops', 'Operations']] },
+  ops: { label: 'AEP Operations', home: '#/ops', tabs: [['ops', '#/ops', 'Operations'], ['opsabout', '#/ops/about', 'How it works']] },
 };
-const PORTAL_OF = { home: 'customer', about: 'customer', ops: 'ops' };
-const VIEWS = ['home', 'about', 'ops'];
+const PORTAL_OF = { home: 'customer', about: 'customer', ops: 'ops', opsabout: 'ops' };
+const VIEWS = ['home', 'about', 'ops', 'opsabout'];
 const WORKSPACES = ['home', 'ops'];  // map + chat areas (each keeps its own state)
 // Old Storm test / Outage test links open Operations on the matching side tab.
 const route = () => {
   const h = window.location.hash;
   if (h.startsWith('#/about')) return { view: 'about' };
+  if (h.startsWith('#/ops/about')) return { view: 'opsabout' };
   if (/^#\/(ops\/)?(storm-test|sandbox)/.test(h)) return { view: 'ops', opsTab: 'storm' };
   if (/^#\/(ops\/)?outage-test/.test(h)) return { view: 'ops', opsTab: 'outage' };
   if (h.startsWith('#/ops')) return { view: 'ops' };
@@ -166,7 +167,8 @@ export default function App() {
                               onError={setError} opsTab={opsTab} onTestHome={() => { setHome(null); setAskHome(true); }}
                               mapTheme={mapTheme} onMapTheme={setMapTheme} active={view === 'ops'} />
               )}
-              {k === 'about' && <AboutPage />}
+              {k === 'about' && <AboutPage portal="customer" />}
+              {k === 'opsabout' && <AboutPage portal="ops" />}
             </Suspense>
           </div>
         ))}

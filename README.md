@@ -19,15 +19,16 @@ Every number in an answer comes from AEP's data and our models, never from the L
 - **Two portals:**
   - **Customer:**
     - **My home:** the live forecast map, a friendly chat, a **My plan** card (labeled emergency, safety and prepare steps, plus alert eligibility), and an outage panel when the feed reports an outage at your home.
-    - **How it works:** the pipeline, metrics, research, what didn't work and what changed, who it helps, and honest limits.
+    - **How it works:** how My home works, organized by the judging rubric (Communication, Innovation, Curiosity, Breadth & Complexity, Impact, Growth Mindset) plus honest limits.
     - **Outside AEP's data?** Any address or map point gets a clearly labeled, low-confidence **regional estimate** from the live forecast and how similar AEP-area homes fare.
   - **AEP Operations (internal):**
     - **Operations** (one map-first page): one storm scenario (a forecast day or a simulated storm) drives everything.
       - **Area view:** expected damage, customers likely out, high-risk circuits, crew-hours and crews needed, and priority facilities (hospitals, fire, ambulance) with suggested actions. Shown on a circuit map (2D dots or 3D columns), with proactive message previews and the alert rules below.
-      - **Test a home:** flies into the detailed 3D map of one home. The side panel has three tabs:
+      - **Home view:** the detailed 3D map of one home. The map follows the side tab (Storm shows the area; Outage test and Chat show the home), and a **Service area | home** toggle switches it by hand. The side panel has three tabs:
         - **Storm:** intensity, crews, duration, affected area, ▶ Play storm.
         - **Outage test:** start a simulated outage at a piece of equipment or anywhere you click. You see where it is, the area affected, when it was reported, the estimated fix and why it takes that long.
         - **Chat:** the staff-voice assistant.
+    - **How it works (staff):** what each KPI means and how it is computed, the model benchmark (incl. the neural-operator test), and the ops pivots, organized by the judging rubric.
   - **The chat adapts its voice:** warm customer service on the customer side, a concise professional briefing on the operations side. Both use the same rules and the same numbers.
 - **Privacy:**
   - Life Support and THREAT flags never reach the model or the LLM.
@@ -86,7 +87,7 @@ Switch portals at the top left: **Customer** or **AEP Operations**.
 1. **My home (Customer):** drag the forecast day slider and switch between **2D** and **3D**. Tap **Will I lose power?** or **How long until my power is back?** Open **My plan** for your steps and alert eligibility, and tap a need (for example *Powered medical device*) to tailor it.
 2. **Regional estimate:** click **Change**, search a place outside the area (for example *Columbus, Ohio*), then **Get a regional estimate for this location**.
 3. **Operations (AEP Operations):** on the **Storm** tab, choose **Simulated storm** and move the intensity to 5. Watch the KPIs, the circuit map and the priority facilities update. Switch the map to **3D** or **☾ Dark**, and enter area crews to see hours to restore.
-4. **Test a home:** press **Test a home →**. Homes, poles and wires near it turn red under the same storm. Change crews, duration and the affected area, or press **▶ Play storm**. On **Chat**, ask the same question as on My home to compare the two voices.
+4. **Home view:** open the **Outage test** or **Chat** tab (choose a home if asked), or use the **Service area | home** toggle. Homes, poles and wires near it turn red under the same storm. Change crews, duration and the affected area, or press **▶ Play storm**. On **Chat**, ask the same question as on My home to compare the two voices.
 5. **Outage test tab:** pick a cause and press **Start outage**. Click a pole or wire on the map to move the fault, ask the chat when power will be back, then press **Restore power**.
 6. **See a real outage on My home:** run `curl -X POST localhost:8000/storm/advance` to step the scripted demo storm forward, and `curl -X POST localhost:8000/storm/reset` to clear it.
 
@@ -218,7 +219,7 @@ curl "localhost:8000/audit?limit=10"     # every tool call: masked input, fields
             ├── Workspace.jsx         useWorkspace (map, outage and chat state) + the My home view
             ├── PlanCard.jsx          My plan: actions and alert eligibility
             ├── OpsDashboard.jsx      AEP Operations page: area KPIs and map, home drill-down, Storm / Outage test / Chat tabs
-            ├── AboutPage.jsx         How it works
+            ├── AboutPage.jsx         How it works, one page per portal (customer and staff)
             ├── RiskMap.jsx           2D/3D deck.gl map
             ├── ChatPanel.jsx         chat, with ConfidenceMeter.jsx
             ├── SandboxPanel.jsx      simulated-storm sliders

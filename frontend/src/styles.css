@@ -283,7 +283,9 @@ button { cursor: pointer; }
 .ops-layer.behind { visibility: hidden; pointer-events: none; }
 .ops-map-bar { top: 12px; left: 12px; width: 290px; display: grid; gap: 8px; }
 .ops-map-bar .legend-note { margin: 0; }
-.btn.ops-back { position: absolute; z-index: 3; top: 12px; left: 50%; transform: translateX(-50%); background: var(--surface); border: 1px solid var(--border); }
+.ops-scope { position: absolute; z-index: 3; top: 12px; left: 50%; transform: translateX(-50%); min-width: 300px; margin: 0; box-shadow: var(--shadow); }
+.ops-scope button { padding: 5px 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-transform: none; }
+.ops-scope button:disabled { opacity: 0.45; cursor: not-allowed; }
 .ops-side { min-height: 0; }
 .ops-tabs { display: grid; grid-template-columns: repeat(3, 1fr); border-bottom: 1px solid var(--border); flex: none; }
 .ops-tabs button { border: 0; background: none; padding: 11px 0; color: var(--muted); font-weight: 600; border-bottom: 2px solid transparent; }
@@ -330,7 +332,8 @@ button { cursor: pointer; }
 @media (max-width: 1200px) { .kpis { grid-template-columns: repeat(3, minmax(0, 1fr)); } .ops-grid { grid-template-columns: 1fr; } }
 @media (max-width: 900px) { .ops-stage { grid-template-columns: 1fr; grid-template-rows: 60vh auto; height: auto; } .ops-side { border-left: 0; border-top: 1px solid var(--border); min-height: 70vh; } }
 @media (max-width: 640px) { .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } .drafts { grid-template-columns: 1fr; } }
-@media (max-width: 640px) { .ops-map-bar { width: auto; right: 12px; padding: 8px; } .ops-map-bar .legend-note { display: none; } }
+@media (max-width: 640px) { .ops-map-bar { width: auto; right: 12px; padding: 8px; } .ops-map-bar .legend-note { display: none; }
+  .ops-scope { top: auto; bottom: 34px; min-width: 0; width: calc(100% - 24px); } }
 
 /* ---- how it works ---- */
 .about { flex: 1; overflow-y: auto; padding: 22px 24px 40px; max-width: 1180px; margin: 0 auto; }
@@ -349,6 +352,13 @@ button { cursor: pointer; }
 .about-metrics b { font-size: 24px; color: var(--accent-2); }
 .about-metrics span { color: var(--muted); font-size: 12px; }
 .about-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 24px; }
+.about h2 { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.about .rubric-tag { text-transform: none; letter-spacing: 0.2px; }
+.kpi-glossary { margin: 0; display: grid; gap: 8px; font-size: 13px; }
+.kpi-glossary div { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; }
+.kpi-glossary dt { font-weight: 700; }
+.kpi-glossary dd { margin: 2px 0 0; color: var(--muted); }
+.about .ops-table + .hint-inline { display: block; margin-top: 8px; font-size: 12.5px; color: var(--muted); }
 .about ul.plain { margin: 0; padding-left: 18px; display: grid; gap: 6px; font-size: 13.5px; }
 .diff, .pivots { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; font-size: 13px; }
 .diff li, .pivots li { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 9px 12px; display: grid; gap: 4px; }

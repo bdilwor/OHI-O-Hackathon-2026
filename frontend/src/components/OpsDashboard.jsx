@@ -58,12 +58,12 @@ export default function OpsDashboard({ home, space, setSpace, notify, onError, o
   const wantHome = useRef(false);
   const homeReady = Boolean(home) && !w.needsAep;
 
-  useEffect(() => { if (opsTab) setTab(opsTab); }, [opsTab]);
-  // After "Test a home" picks a location, fly into it; starting an outage does the same.
+  // The map follows the tool in use: Storm shows the area, Outage test and Chat show the chosen home.
+  const pickTab = (id) => { setTab(id); setScope(id === 'storm' ? 'area' : 'home'); };
+  useEffect(() => { if (opsTab) pickTab(opsTab); }, [opsTab]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { if (home && wantHome.current) { wantHome.current = false; setScope('home'); } }, [home]);
   useEffect(() => { if (w.params.active && homeReady) setScope('home'); }, [w.params.active]); // eslint-disable-line react-hooks/exhaustive-deps
-  useEffect(() => { if (!home) setScope('area'); }, [home]);
-  const testHome = () => { if (home) setScope('home'); else { wantHome.current = true; onTestHome(); } };
+  const showHome = scope === 'home' && homeReady;
 
   useEffect(() => {
     api.forecast().then((f) => setDays(f.days || [])).catch(() => {});
@@ -153,9 +153,9 @@ export default function OpsDashboard({ home, space, setSpace, notify, onError, o
       )}
 
       <div className="ops-stage">
-        <section className="map-wrap ops-stage-map" aria-label={scope === 'area' ? 'Service area risk map' : 'Home map'}>
+        <section className="map-wrap ops-stage-map" aria-label={showHome ? 'Home map' : 'Service area risk map'}>
           {/* Both maps stay mounted at full size; the one behind keeps its tiles and meshes ready, so switching is instant. */}
-          <div className={`ops-layer ${scope === 'home' && homeReady ? 'behind' : ''}`} aria-hidden={scope === 'home' && homeReady}>
+          <div className={`ops-layer ${showHome ? 'behind' : ''}`} aria-hidden={showHome}>
               <DeckGL initialViewState={AREA_VIEW[viewMode]} controller layers={layers}
                       getTooltip={({ object: o }) => o && (o.circuit && o.customers != null
                         ? `Circuit ${o.circuit}\n${fmt(o.customers)} customers\nMain-line damage chance ${pct(o.main_line_p)}\nExpected damage ${o.expected_damage}`
@@ -163,19 +163,17 @@ export default function OpsDashboard({ home, space, setSpace, notify, onError, o
                 <Map mapStyle={BASEMAPS[mapTheme]} reuseMaps attributionControl />
               </DeckGL>
               <div className="panel ops-map-bar">
-                <button type="button" className="btn small primary" onClick={testHome}>Test a home →</button>
                 <ViewToggle viewMode={viewMode} onViewMode={setViewMode} theme={mapTheme} onTheme={onMapTheme} />
                 <p className="legend-note">{is3d ? 'Column height = expected damage' : 'Dot size = customers'} · color = main-line
                   damage chance · bright dots = critical facilities</p>
               </div>
           </div>
           {homeReady && (
-            <div className={`ops-layer ${scope !== 'home' ? 'behind' : ''}`} aria-hidden={scope !== 'home'}>
+            <div className={`ops-layer ${showHome ? '' : 'behind'}`} aria-hidden={!showHome}>
               <RiskMap data={mapData} viewMode={homeView} layersOn={layersOn} bottleneck={outage?.bottleneck || bottleneck}
                        onMapClick={([lon, lat]) => w.setParams({ ...w.params, point: [lon, lat] })} wind={w.wind}
                        pathState={w.pathState} footprint={sandbox && mapData ? storm.radius_m : null} outage={outage}
-                       basemap={BASEMAPS[mapTheme]} active={active && scope === 'home'} />
-              <button type="button" className="btn small ghost ops-back" onClick={() => setScope('area')}>← Back to area</button>
+                       basemap={BASEMAPS[mapTheme]} active={active && showHome} />
               <MapControls viewMode={homeView} onViewMode={setHomeView} theme={mapTheme} onTheme={onMapTheme} storm={storm}
                            showForecast={false} layersOn={layersOn} loading={w.loading}
                            onToggle={(id) => setLayersOn((l) => ({ ...l, [id]: !l[id] }))} />
@@ -183,12 +181,19 @@ export default function OpsDashboard({ home, space, setSpace, notify, onError, o
               {!outage && <Legend stormLabel={stormLabel(mapData?.storm)} />}
             </div>
           )}
+          <div className="segmented two ops-scope" role="group" aria-label="Map scope">
+            <button type="button" aria-pressed={!showHome} onClick={() => setScope('area')}>Service area</button>
+            <button type="button" aria-pressed={showHome} disabled={!homeReady} onClick={() => setScope('home')}
+                    title={homeReady ? undefined : 'Choose a home on the Outage test or Chat tab'}>
+              {homeReady ? home.masked_address : 'Home'}
+            </button>
+          </div>
         </section>
 
         <aside className="side ops-side" aria-label="Scenario, outage test and chat">
           <div className="ops-tabs" role="tablist" aria-label="Operations tools">
             {SIDE_TABS.map(([id, label]) => (
-              <button key={id} type="button" role="tab" aria-selected={tab === id} onClick={() => setTab(id)}>{label}</button>
+              <button key={id} type="button" role="tab" aria-selected={tab === id} onClick={() => pickTab(id)}>{label}</button>
             ))}
           </div>
           <div className={`ops-tab-body ${tab === 'chat' ? 'chat-tab' : ''}`} role="tabpanel">
