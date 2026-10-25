@@ -1,5 +1,10 @@
-# Challenge data (379 MB, provided separately; mounted into Docker at runtime)
+# Challenge data (~379 MB, provided separately; mounted into Docker at runtime)
 data/
+
+# Secrets: copy .env.example to .env (API keys live only there)
+.env
+.env.*
+!.env.example
 
 # Python
 __pycache__/
@@ -11,38 +16,43 @@ venv/
 .mypy_cache/
 .ruff_cache/
 
-# Tests (pytest in backend/tests)
+# Backend tests (pytest in backend/tests)
 .pytest_cache/
 .coverage
 .coverage.*
 htmlcov/
 
 # ML: intermediate datasets are rebuilt by `docker compose run --rm ml`.
-# Committed on purpose: trained model (*.joblib), metrics, plots, ASSUMPTIONS.md, demo/cache.json.
+# Committed on purpose: trained models (*.joblib), metrics, plots, ASSUMPTIONS.md, demo/cache.json.
 backend/ml/artifacts/*.parquet
 
-# Environment / secrets: copy .env.example to .env (API keys live only there)
-.env
-.env.*
-!.env.example
+# Runtime logs (incl. the API audit log, backend/logs/audit.jsonl)
+backend/logs/
+*.log
+
+# Frontend (React + Vite)
+node_modules/
+dist/
+.vite/
+coverage/
+*.tsbuildinfo
+.eslintcache
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Browser test output (Playwright)
+test-results/
+playwright-report/
+playwright/.cache/
 
 # Docker: personal overrides
 docker-compose.override.yml
 
-# Logs (incl. the API audit log at backend/logs/audit.jsonl)
-*.log
-backend/logs/
-
-# Frontend (React, for later)
-node_modules/
-dist/
-build/
-.vite/
-coverage/
-npm-debug.log*
-yarn-error.log*
-
 # OS / editor
 .DS_Store
+Thumbs.db
+*.swp
 .vscode/
 .idea/

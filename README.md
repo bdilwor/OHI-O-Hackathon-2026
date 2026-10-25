@@ -1,255 +1,254 @@
 # AI Outage Concierge: HackOHI/O 2026 (AEP challenge)
 
-An AI assistant that answers a customer's storm questions ("Will I lose power?", "How long could it take?", "What should I do?", "Do I qualify for alerts?"). Every number comes from AEP data and our models, never from the LLM.
+An AI assistant that helps AEP customers before and during a storm. A customer finds their home on a 3D map and asks plain questions:
+- "Will I lose power?"
+- "How long until my power is back?"
+- "What should I do?"
+- "Do I qualify for alerts?"
 
-## Status
+Every number in an answer comes from AEP's data and our models, never from the LLM.
 
-| Part | State |
-|---|---|
-| Data → PostGIS (ARCOS, GIS, topology, STORMS labor) | ✅ Done |
-| Outage-risk model (trained on 35 past storms, calibrated, explainable) | ✅ Done |
-| Restoration estimator (STORMS labor × AEP structure drawings × Monte Carlo) | ✅ Done |
-| FastAPI tools, privacy filter, audit log, demo storm timeline | ✅ Done |
-| LLM assistant (Groq → Gemini fallback, grounding check, offline mode) | ✅ Done, live-tested with Groq |
-| Live weather forecast → storm size for the model (Open-Meteo) | ✅ Done |
-| React frontend: forecast-driven 2D/3D map (generic houses, trees, poles, equipment) + chat | ✅ Done |
-| Storm test + Outage test areas, outage details panel, notifications | ✅ Done |
-| Tests | ✅ 134 backend tests + scripted browser walkthrough |
+**What it does**
+- **Outage-risk model:** a calibrated, explainable logistic regression trained on 35 past storms (ARCOS damage reports). It scores 333k poles, wires and devices, and rolls the scores up along each home's real supply path.
+- **Live forecast:** each day of the Open-Meteo 7-day forecast is turned into a storm size, and the map shows the model's prediction for that day.
+- **Restoration estimates:** STORMS labor hours × repair bundles from AEP structure drawings × a 2,000-run Monte Carlo. The result is a P10/P50/P90 range in hours.
+- **Chat assistant:** Groq (with a Gemini fallback, or a fully offline rules mode). Each answer is built from tool results:
+  - a direct answer
+  - 2–3 things that could change it
+  - one confidence meter that lists missing data when confidence is below 60%
+- **Three areas in the web app:**
+  - **My home:** the live forecast map, chat, and an outage panel when the feed reports an outage at your home.
+  - **Storm test:** sliders for storm intensity, crews, duration and affected area, to see how a storm would hit the area.
+  - **Outage test:** start a simulated outage at a chosen piece of equipment, or anywhere you click on the map. You see where it is, the area affected, when it was reported, the estimated fix (day, month, year) and why it takes that long.
+- **Privacy:**
+  - Life Support and THREAT flags never reach the model or the LLM.
+  - IDs and exact coordinates are redacted.
+  - Every tool call is audit-logged.
+- **Notifications:** toasts appear when the forecast, your risk, the repair estimate or an outage changes, and disappear after 4 s. A bell keeps the history.
 
-## Quick start
+## Prerequisites
 
-You need **Docker Desktop**, with at least 6 GB of memory. You also need the challenge files.
+- **Docker Desktop** with at least 6 GB of memory.
+- **The challenge data** (about 379 MB). It is provided separately and is not in git.
+- *Optional:* a free **Groq API key** ([console.groq.com](https://console.groq.com)). Without one, the assistant runs in offline mode: the same tools and answer format, with rules-based wording.
+- *Optional, only to run the frontend outside Docker:* Node 18+.
 
-1. **Add the data.** Put the challenge files in `data/`. They are gitignored and provided separately. The folder should contain:
-   - `data/Data1/`
-   - `data/Data2/`
-   - `data/matched_upstream.txt`
-   - `data/Install_Labor_HackOHIO.xlsx`
-   - `data/structure_drawings.pdf`
-2. **Optional: add an LLM key.**
-   ```bash
-   cp .env.example .env      # then paste your GROQ_API_KEY (free at console.groq.com)
+## Start it
+
+1. **Add the data.** Put the challenge files in `data/` so it contains:
    ```
-   Without a key, the assistant runs in **offline mode**: a rules-based router that uses the same tools and answers in the same format.
+   data/Data1/
+   data/Data2/
+   data/matched_upstream.txt
+   data/Install_Labor_HackOHIO.xlsx
+   data/structure_drawings.pdf
+   ```
+2. **Add your LLM key (optional):**
+   ```bash
+   cp .env.example .env      # then set GROQ_API_KEY (and GEMINI_API_KEY for the fallback)
+   ```
 3. **Start everything:**
    ```bash
    docker compose up -d --build
    ```
-   On the first run this:
-   - starts PostGIS
-   - loads the data (~1–2 min)
-   - publishes the per-asset risk table from the committed model (~30 s)
-   - starts the API
-   - installs and starts the web app
+   This starts four services:
 
-   Later runs skip the loading and are ready in seconds.
-4. **Check it's up.** The API is ready once `/health` returns `{"ok": true, ...}`:
+   | Service | What it does |
+   |---|---|
+   | `db` | PostGIS 16 |
+   | `loader` | Loads the data (~1–2 min) and scores every asset with the committed model (~30 s), then exits. Later runs skip both steps. |
+   | `api` | FastAPI on http://localhost:8000. Interactive docs are at `/docs`. |
+   | `web` | The React app on http://localhost:5173 |
+
+4. **Check it's ready:**
    ```bash
-   docker compose ps                           # loader: "Exited (0)", api: "running"
-   curl localhost:8000/health
+   docker compose ps              # loader: "Exited (0)", api and web: "running"
+   curl localhost:8000/health     # {"ok": true, ...}
    ```
-   Interactive API docs: http://localhost:8000/docs
-5. **Open the app:** http://localhost:5173. Click **try the demo address**, then **Yes, this is my home**.
+5. **Open http://localhost:5173.** Click **try the demo address**, then **Yes, this is my home**.
 
-## Test it
+Stop everything with `docker compose down`. The database is kept in a Docker volume.
 
-**A. Full automated suite** (~30 s):
+## Use it
+
+1. **My home:** drag the forecast day slider and switch between **2D** and **3D**. Tap **Will I lose power?** or **How long until my power is back?**
+2. **Storm test:** move the intensity slider to 5 and watch homes, poles and wires turn red. Then change crews, duration and the affected area, or press **▶ Play storm**.
+3. **Outage test:** pick a cause and press **Start outage**. Click a pole or wire on the map to move the fault, ask the chat when power will be back, then press **Restore power**.
+4. **See a real outage on My home:** run `curl -X POST localhost:8000/storm/advance` to step the scripted demo storm forward, and `curl -X POST localhost:8000/storm/reset` to clear it.
+
+For a scripted presentation (browser and curl), see [backend/demo/DEMO_SCRIPT.md](backend/demo/DEMO_SCRIPT.md).
+
+## Run the tests
+
+The backend suite runs inside Docker against the loaded database (start the stack first):
+
 ```bash
-docker compose run --rm ml pytest -q tests
+docker compose run --rm ml pytest -q tests                        # all tests (~30 s): 134 passed
+docker compose run --rm ml pytest -q tests/test_outages.py        # one file
+docker compose run --rm ml pytest -q tests -k restoration         # tests matching a name
 ```
-Expected: `134 passed`. If no `GROQ_API_KEY` is set, the live-LLM test is reported as skipped. The suite covers:
-- data loading and row counts
-- training quality and no data leakage between storms
-- the model's link to the database
-- restoration behavior (crews, delays, extra damage)
-- every API endpoint
-- privacy (no Life Support/THREAT flag, IDs or coordinates in any output)
-- the assistant's routing, refusals, fallbacks and grounding check
-- the full 8-beat demo
-- outages: affected area from the real topology, ETR after the report time, map clicks resolved to equipment, nothing written
 
-**B. Try the main calls by hand:**
+If no `GROQ_API_KEY` is set, or the free tier is rate-limited, the live-LLM test is skipped.
+
+| Test file | Covers |
+|---|---|
+| `test_database.py`, `test_db_link.py` | Data loading, row counts, and the model's link to the database |
+| `test_training.py`, `test_scoring.py` | Model quality, no leakage between storms, scoring |
+| `test_restoration.py` | Crews, delays and extra damage move the estimate the right way |
+| `test_forecast.py` | Forecast → storm size (uses a fixture, no network) |
+| `test_api.py`, `test_map.py` | Every endpoint and the map payload |
+| `test_privacy.py` | No Life Support/THREAT flags, IDs or coordinates in any output |
+| `test_assistant.py` | Routing, refusals, fallbacks, the grounding check, and the live LLM (if a key is set) |
+| `test_sandbox.py`, `test_outages.py` | Storm test and Outage test, including that neither writes to the database |
+| `test_demo.py` | The full 8-beat demo storm |
+
+**Frontend checks:**
+```bash
+cd frontend && npm install && npm run build && npm audit
+```
+
+**Manual API calls:**
 ```bash
 curl "localhost:8000/lookup?address=7110%20Rabbit%20Run,%20Roanoke"
-
-curl -X POST localhost:8000/tools/get_outage_risk -H 'content-type: application/json' \
-  -d '{"premise":"982542862"}'
-
-curl -X POST localhost:8000/tools/estimate_restoration -H 'content-type: application/json' \
-  -d '{"premise":"982542862","crew_arrival_delay_hrs":24}'
-
+curl -X POST localhost:8000/tools/get_outage_risk -H 'content-type: application/json' -d '{"premise":"982542862"}'
 curl -X POST localhost:8000/chat -H 'content-type: application/json' \
   -d '{"session_id":"me","premise":"982542862","message":"Will I lose power?"}'
+curl "localhost:8000/outage-test?premise=982542862&device=1&cause=tree"
+curl "localhost:8000/audit?limit=10"     # every tool call: masked input, fields returned and redacted
 ```
-
-**C. Walk the full demo** (storm timeline, proactive messages, what-ifs, escalation, refusals, fallback): follow [backend/demo/DEMO_SCRIPT.md](backend/demo/DEMO_SCRIPT.md). Add `"demo_safe": true` to any `/chat` call to serve the pre-recorded answers in `backend/demo/cache.json` if the network or the LLM fails during a presentation.
-
-**D. Click through the app** at http://localhost:5173:
-1. Use the demo address.
-2. Look at the 3D map for today's real forecast (usually mostly green), then drag the forecast day slider. The "No outages reported at your home" chip shows there's no current outage.
-3. Tap **Will I lose power?** You get an answer, what could change it, and a confidence meter.
-4. Tap **How long would repairs take?** on a far-out forecast day. Confidence drops below 60%, and the missing data is listed.
-5. Switch between **2D** and **3D**.
-6. Open **Storm test**, drag the intensity slider to 5 and watch homes, poles and wires turn orange and red. Toasts appear and fade after about 4 s.
-7. Open **Outage test**, press **Start outage**, then click a pole or wire elsewhere on the map. The outage panel shows where it is, the area affected, when it was reported, the estimated fix (day, month, year) and why it takes that long. Ask **How long until my power is back?**, then press **Restore power**.
-
-**E. See the controls:** `curl "localhost:8000/audit?limit=10"` shows every tool call, with a masked input, the fields returned and the fields redacted.
-
-## Three areas: My home, Storm test and Outage test
-
-- **My home** (`#/`) is what a customer sees. It shows the live 7-day forecast, the outage model's prediction for the selected day, and the chat. If the outage feed reports an outage at the home (in this project, the demo storm timeline after `POST /storm/advance`), the **outage panel** appears; otherwise a small "No outages reported at your home" chip shows.
-- **Storm test** (`#/storm-test`; `#/sandbox` still works) has sliders for **storm intensity (1–5)**, **available crews (1–30)**, **storm duration (1–5 days)** and the **affected area** (metres or yards, centered on the home).
-  - **Play storm** ramps the storm up and back down.
-  - The map, the notifications and the chat all react to the sliders.
-  - It uses the real model read-only; nothing is saved (a test checks this).
-- **Outage test** (`#/outage-test`) simulates a real outage. Pick where the fault is from the equipment on your supply path (transformer, fuses, reclosers) **or click any pole, wire or piece of equipment on the map**. Choose a cause (tree, broken pole, vehicle, transformer failure, lightning, equipment failure), how long ago it was reported (0–24 h) and the crews (1–30), then **Start outage** / **Restore power**.
-  - The map draws the affected area (red polygon), the fault pin, and turns affected homes red with dark windows.
-  - The chat knows the power is out and answers repair-time questions from this outage.
-  - Test outages stay in this tab and are never saved.
-- **The outage panel** (same in My home and Outage test) shows the cause, **where** the fault is, the **area affected** (homes, km², streets), when it was **reported** and the **estimated fix** with its likely range (dates like "Sat, 24 Oct 2026, 10:18 pm"), progress so far, and **why it will take about X hours** (repair work, crews and arrival, upstream-first order, travel/safety factor).
-- **Notifications** pop up when the forecast, your outage risk, the repair estimate, the number of nearby predicted outages or an outage changes. Real outage events also arrive over SSE. Toasts disappear after 4 s (hovering pauses that), at most 3 show at once, and a repeat of the same alert replaces the earlier one. A bell keeps the history, and desktop alerts are optional.
-
-## Frontend: forecast-driven 2D/3D map + chat
-
-The map is on the left and the chat on the right. Everything on the map is the **outage model's prediction for one day of the live weather forecast** (Open-Meteo, from today through 6 days out). Use **Storm test** to see the map under a storm on a calm week.
-
-| Control | What it does |
-|---|---|
-| **2D / 3D** | 2D: flat homes, equipment and lines. 3D: generic low-poly models (built in code, no model files) |
-| **Forecast day slider** | Today … +6 days; each day's peak gust and conditions set the storm size the model uses |
-| **Layers** | Homes · poles, equipment & lines · trees · your supply path |
-
-Colors run from **green (good) to red (bad)**:
-- **Homes:** chance of an outage in that area. Your house is the large one and uses the full premise model.
-- **Trees:** colored like the nearest home. They are placed only inside real OpenStreetMap wooded and park areas from the basemap; the challenge data has no vegetation.
-- **Poles, transformers, fuses, reclosers and wires:** chance that item is damaged. Overhead wires are drawn at pole height in 3D.
-
-The supply path (home → transformer → fuse → reclosers) shows flowing current, and the restoration bottleneck is labeled.
-
-**Chat answers** have three parts:
-1. **A direct answer** from the backend's tools: the live LLM, or the rules-based fallback.
-2. **"What could change this"** with 2–3 items, for outage-chance and repair-time questions.
-3. **One confidence meter.** Below 60%, it lists the 2–3 missing data points that would make the answer more certain.
-
-The chat uses the same day or storm as the map. Confidence is a documented data-support score, not a statistical probability (see [ASSUMPTIONS.md](backend/ml/ASSUMPTIONS.md)).
-
-Run the frontend on its own (outside Docker): `cd frontend && npm install && npm run dev`. It needs Node 18+ and expects the API on :8000.
 
 ## Common tasks
 
 | Task | Command |
 |---|---|
-| Stop everything (data is kept) | `docker compose down` |
+| Stop (data kept) | `docker compose down` |
 | Wipe the database and start fresh | `docker compose down -v && docker compose up -d --build` |
 | Force a data reload | `FORCE_RELOAD=1 docker compose up loader` |
 | Retrain the model (~5 min) | `docker compose run --rm ml` |
-| Regenerate the demo cache (uses the LLM if a key is set) | `docker compose run --rm ml python -m demo.build_cache` |
-| Score one premise from the CLI | `docker compose run --rm ml python -m ml.score 982542862 --severity high` |
-| API logs | `docker compose logs -f api` |
-| Web app logs | `docker compose logs -f web` |
-| Production build of the web app | `cd frontend && npm run build` (outputs `frontend/dist/`) |
-
-## Troubleshooting
-
-| Problem | Fix |
-|---|---|
-| `port is already allocated` (5432, 8000 or 5173) | Set `POSTGRES_PORT`, `API_PORT` or `WEB_PORT` in `.env` |
-| The map is blank | WebGL must be enabled in your browser; the basemap needs internet access (CARTO tiles) |
-| The loader exits with an error | Check `data/` has all the files listed above; then run `docker compose logs loader` |
-| `/chat` replies end with "LLM unavailable … answered with the rules-based assistant" | Your key, model name or quota is the problem. Groq retires models: list yours via `https://api.groq.com/openai/v1/models`, then set `GROQ_MODEL` in `.env` |
-| You changed `requirements.txt` | `docker compose build` |
-| A container is killed or loading is very slow | Give Docker Desktop more memory (≥ 6 GB) |
-
-## Architecture
-
-```mermaid
-flowchart LR
-  subgraph Data["PostGIS (docker: db)"]
-    RAW[(Challenge data\nARCOS, GIS, topology,\nSTORMS labor)]
-    PRIV[(customer_private\nlife-support / threat\nbackend-only)]
-    RISK[(asset_risk\nper-asset P(damage))]
-  end
-  ML["ml/ pipeline\nbuild_dataset → train →\nduration → score_assets"] --> RISK
-  RAW --> ML
-  subgraph API["FastAPI (docker: api)"]
-    TOOLS["tools.py\nget_outage_risk · estimate_restoration\nprep_guidance · check_alert_eligibility\ndraft_message"]
-    PRIVACY["privacy.py\nredact + audit log"]
-    ASSIST["assistant.py\nLLM tool loop · grounding check\nanswer card · offline / demo-safe"]
-    STORM["storm.py\ndemo timeline + SSE"]
-  end
-  RISK --> TOOLS
-  RAW --> TOOLS
-  PRIV -. escalation priority only .-> TOOLS
-  TOOLS --> PRIVACY --> ASSIST
-  ASSIST <--> LLM["Groq → Gemini fallback\n(OpenAI-compatible)"]
-  STORM --> TOOLS
-  CLIENT["React web app\n3D risk map + chat\n(docker: web)"] <--> API
-```
-
-- **Risk:**
-  - Calibrated logistic regression trained on 35 past storms; P(damage) for 333k assets.
-  - Rolled up along each premise's network path.
-  - Details: [ASSUMPTIONS.md](backend/ml/ASSUMPTIONS.md), [METRICS.md](backend/ml/artifacts/METRICS.md).
-- **Restoration:**
-  - STORMS labor hours × repair bundles from AEP structure drawings × an indirect-labor multiplier of 4.5.
-  - 2,000-run Monte Carlo with upstream-first step restoration gives a P10/P50/P90 range in hours. No ETA model is trained.
-- **Grounding and privacy:**
-  - The LLM never sees the premise number or any private field.
-  - Every number in its reply must appear in a tool result, or the reply is replaced with the deterministic answer.
-  - The answer card is built from tool results, not LLM text.
-  - Escalations are always stated by the backend, never left to the LLM.
-- **Demo timeline:** the scripted storm's confirmed facts apply only to the demo home (premise `982542862`). Every other address just sees "a storm is forecast".
+| Score one home from the CLI | `docker compose run --rm ml python -m ml.score 982542862 --severity high` |
+| Rebuild the demo-safe chat cache | `docker compose run --rm ml python -m demo.build_cache` |
+| Follow the logs | `docker compose logs -f api` · `docker compose logs -f web` |
+| Run the frontend outside Docker | `cd frontend && npm install && npm run dev` (expects the API on :8000) |
 
 ## Configuration (`.env`)
 
 | Variable | Default | Purpose |
 |---|---|---|
 | `LLM_PROVIDER` | `groq` | `groq` (falls back to Gemini), `gemini`, or `offline` |
-| `GROQ_API_KEY` / `GROQ_MODEL` | – / `openai/gpt-oss-120b` | Groq free tier |
+| `GROQ_API_KEY` / `GROQ_MODEL` | – / `openai/gpt-oss-120b` | Groq |
 | `GEMINI_API_KEY` / `GEMINI_MODEL` | – / `gemini-2.0-flash` | Gemini fallback |
 | `POSTGRES_PORT`, `API_PORT`, `WEB_PORT` | `5432`, `8000`, `5173` | Host ports |
 | `FORCE_RELOAD` | `0` | `1` makes the loader reload all data |
+
+## Troubleshooting
+
+| Problem | Fix |
+|---|---|
+| `port is already allocated` | Set `POSTGRES_PORT`, `API_PORT` or `WEB_PORT` in `.env` |
+| The map is blank | Enable WebGL in your browser; the basemap also needs internet access (CARTO tiles) |
+| The loader exits with an error | Check `data/` has every file listed above, then run `docker compose logs loader` |
+| Chat says "LLM unavailable … answered with the rules-based assistant" | Check your key, model name or quota. Groq retires models: list yours at `https://api.groq.com/openai/v1/models` and set `GROQ_MODEL` |
+| A container is killed, or loading is very slow | Give Docker Desktop more memory (≥ 6 GB) |
+| You changed `requirements.txt` | `docker compose build` |
+
+## File structure
+
+```
+.
+├── docker-compose.yml        db, loader, api, web (+ ml profile for training and tests)
+├── .env.example              copy to .env for API keys and ports
+├── data/                     challenge data (not in git)
+├── backend/                  Python 3 · FastAPI · PostGIS
+│   ├── Dockerfile, requirements.txt, pytest.ini
+│   ├── main.py               FastAPI app and endpoints
+│   ├── tools.py              assistant tools: risk, restoration, guidance, alerts, messages, storm test
+│   ├── assistant.py          LLM middleware: tool loop, grounding check, offline mode
+│   ├── confidence.py         confidence score, missing data, "what could change this"
+│   ├── restoration.py        labor bundles + Monte Carlo restoration estimate
+│   ├── outages.py            outage records: fault location, affected area, ETR and why
+│   ├── mapdata.py            map payload (homes, equipment, wires, supply path)
+│   ├── forecast.py           Open-Meteo forecast → storm size
+│   ├── guidance.py           prep guidance, alert rules, SMS drafts
+│   ├── privacy.py            redaction and the audit log (written to backend/logs/)
+│   ├── lookup.py             address and map-click lookup
+│   ├── storm.py              scripted demo storm timeline + SSE events
+│   ├── db/                   data loader: shapefiles, topology, labor workbook → PostGIS
+│   ├── ml/                   risk model: build_dataset → train → duration → score_assets; score.py scorer
+│   │   ├── ASSUMPTIONS.md    every modelling assumption, documented
+│   │   └── artifacts/        trained model, metrics, plots (intermediate .parquet files not in git)
+│   ├── demo/                 scenario.json, DEMO_SCRIPT.md, demo-safe cache.json, build_cache.py
+│   └── tests/                pytest suite (+ fixtures/)
+└── frontend/                 React 18 · Vite · deck.gl · MapLibre
+    ├── index.html, package.json, vite.config.js
+    └── src/
+        ├── App.jsx           tabs (My home, Storm test, Outage test) and per-tab state
+        ├── api.js            API client
+        ├── notify.js         what changed between map snapshots → notifications
+        ├── format.js         risk colors and safe markdown for replies
+        ├── meshes.js         generic 3D models (houses, trees, poles, equipment) built in code
+        ├── trees.js          tree placement from OpenStreetMap areas and around homes
+        ├── styles.css
+        └── components/
+            ├── Workspace.jsx         one map + chat area
+            ├── RiskMap.jsx           2D/3D deck.gl map
+            ├── ChatPanel.jsx         chat, with ConfidenceMeter.jsx
+            ├── SandboxPanel.jsx      Storm test sliders
+            ├── OutageTestPanel.jsx   Outage test controls
+            ├── OutageCard.jsx        outage panel (where, area, reported, estimated fix, why)
+            ├── Notifications.jsx     toasts and the notification bell
+            ├── LocationStep.jsx      "Is this your home?"
+            └── AuditDrawer.jsx       privacy & audit log view
+```
+
+## How it works
+
+```mermaid
+flowchart LR
+  subgraph Data["PostGIS (db)"]
+    RAW[(Challenge data\nARCOS, GIS, topology,\nSTORMS labor)]
+    PRIV[(customer_private\nlife-support / threat\nbackend-only)]
+    RISK[(asset_risk\nper-asset P(damage))]
+  end
+  ML["ml/ pipeline"] --> RISK
+  RAW --> ML
+  subgraph API["FastAPI (api)"]
+    TOOLS["tools.py · restoration.py\noutages.py · mapdata.py"]
+    PRIVACY["privacy.py\nredact + audit"]
+    ASSIST["assistant.py\ntool loop · grounding check"]
+  end
+  RISK --> TOOLS
+  RAW --> TOOLS
+  PRIV -. escalation priority only .-> TOOLS
+  FC["Open-Meteo forecast"] --> TOOLS
+  TOOLS --> PRIVACY --> ASSIST
+  ASSIST <--> LLM["Groq → Gemini\n(or offline)"]
+  WEB["React app (web)\nmap + chat"] <--> API
+```
+
+- **Grounding:**
+  - The LLM never sees the premise number or any private field.
+  - Every number in its reply must appear in a tool result. If one doesn't, the deterministic answer is used instead.
+  - Safety and escalation lines are always added by the backend.
+- **Confidence** is a documented data-support score, not a statistical probability.
+- **Assumptions and results:** [backend/ml/ASSUMPTIONS.md](backend/ml/ASSUMPTIONS.md) has every assumption, including the forecast bridge, the repair bundles, the Storm test and the Outage test. [METRICS.md](backend/ml/artifacts/METRICS.md) has model performance.
 
 ## API
 
 | Endpoint | Purpose |
 |---|---|
-| `GET /lookup?address=` · `?lat=&lon=` | "Is this your home?" candidates (masked address, overhead/underground) |
-| `POST /tools/get_outage_risk` | Risk band, probability, confidence, factors, assumptions |
-| `POST /tools/estimate_restoration` | P10/P50/P90 hours, bottleneck, drivers. What-ifs: `crews`, `crew_arrival_delay_hrs`, `extra_damage`, `access_blocked`, `storm_severity` |
-| `POST /tools/prep_guidance` | Labeled EMERGENCY / SAFETY / PREPARE actions for **declared** needs |
-| `POST /tools/check_alert_eligibility` | Which documented alert rules fire (channel, timing, escalation) |
-| `POST /tools/draft_message` | `pre_storm`, `outage_confirmed`, `estimate_updated`, `restored` SMS (≤320 chars) |
-| `POST /storm/advance` · `/storm/reset` · `GET /storm/state` · `/storm/events` (SSE) · `/storm/messages` | Demo storm timeline and proactive messages |
-| `POST /chat` | `{reply, question_type, what_could_change, confidence: {score, label, missing}, storm, tools_used, mode}`; send `storm: {mode, day}` to match the map and `outage: {...}` during an Outage test |
-| `GET /audit` | Tool-call audit log |
-| `GET /map/context?premise=&day=` · `&mode=sandbox&intensity=&crews=&duration_days=&radius_m=` | Map payload: homes, poles, equipment, 3D lines, supply path, forecast, your risk (Storm test: simulated storm + restoration) |
-| `GET /outages/current?premise=` | The current outage at this home from the outage feed (demo timeline), or `null` |
-| `GET /outage-test/devices?premise=` | Equipment on the home's supply path to pick as a fault location |
-| `GET /outage-test?premise=&device=` · `&lat=&lon=` · `&cause=&reported_hours_ago=&crews=` | Simulated outage: location, affected area, reported time, ETR range, why it takes that long (read-only, audited) |
-| `GET /forecast?premise=` | Live 7-day forecast and the storm size each day implies |
-| `GET /health` | Readiness |
-
-## Repository layout
-```
-backend/
-  db/             data loader (shapefiles, topology, labor workbook → PostGIS)
-  ml/             risk model pipeline, scorer, duration helper, ASSUMPTIONS.md, artifacts/
-  main.py         FastAPI app              tools.py       tool implementations (+ memo cache)
-  restoration.py  labor + Monte Carlo      guidance.py    prep / alert rules / messages
-  privacy.py      redaction + audit        assistant.py   LLM middleware
-  storm.py        demo timeline            lookup.py      address / map lookup
-  mapdata.py      map payload            forecast.py    live forecast -> storm size
-  outages.py      outage records: fault location, affected area, ETR and why
-  confidence.py   confidence score, missing data, what could change the answer
-  demo/           scenario.json, DEMO_SCRIPT.md, cache.json, build_cache.py
-  tests/          pytest suite
-frontend/         React app (Vite)
-  src/            RiskMap (deck.gl 2D/3D), meshes.js (generic models), trees.js (OSM trees), ChatPanel, ConfidenceMeter,
-                  SandboxPanel (Storm test), OutageTestPanel, OutageCard, Notifications
-```
+| `GET /lookup?address=` · `?lat=&lon=` | "Is this your home?" candidates |
+| `POST /chat` | Assistant reply + what could change it + confidence. Accepts `storm` (match the map) and `outage` (Outage test) |
+| `POST /tools/{get_outage_risk, estimate_restoration, prep_guidance, check_alert_eligibility, draft_message}` | The assistant's tools, callable directly |
+| `GET /map/context?premise=&day=` · `&mode=sandbox&intensity=&crews=&duration_days=&radius_m=` | Map payload for a forecast day or a Storm test |
+| `GET /forecast?premise=` | 7-day forecast and the storm size each day implies |
+| `GET /outages/current?premise=` | Current outage at this home (demo feed), or `null` |
+| `GET /outage-test/devices?premise=` · `GET /outage-test?premise=&device=\|lat=&lon=&cause=&reported_hours_ago=&crews=` | Outage test: fault locations, and the simulated outage record |
+| `POST /storm/advance` · `/storm/reset` · `GET /storm/state` · `/storm/events` (SSE) | Scripted demo storm |
+| `GET /audit` · `GET /health` | Audit log · readiness |
 
 ## Known limitations
-- **Wire repairs are a lower bound.** The STORMS data has no conductor-restringing hours.
-- **The demo storm is scripted.** Sessions and the storm state are in memory, so run a single API worker.
-- **LLM wording varies between runs.** Numbers are still grounded (enforced), and safety and escalation lines are added by the backend.
+
+- **Wire repairs are a lower bound.** The STORMS data has no hours for restringing conductor.
+- **The demo storm is scripted** and applies only to the demo home (premise `982542862`). Sessions and storm state live in memory, so run a single API worker.
+- **Outage test fault mapping is simplified.** A pole or wire fault is assumed to trip the nearest fuse or recloser on the same circuit within 400 m.
+- **LLM wording varies between runs.** The numbers are still checked against tool results.
