@@ -177,3 +177,34 @@ def test_grounding_reads_unicode_fractions():
     assert grounded("About 1½ hours.", [{"p50_hrs": 1.5}])[0]
     ok, bad = grounded("About 2½ hours.", [{"p50_hrs": 1.5}])
     assert not ok and bad == [2.5]
+
+
+# ---- audience: friendly customer voice vs. professional AEP operations voice ----
+
+def _numbers(text):
+    import re
+    return sorted(re.findall(r"\d+(?:\.\d+)?", text))
+
+
+@pytest.mark.parametrize("question", ["Will I lose power?", "How long could restoration take?"])
+def test_operations_voice_differs_but_numbers_match(client, fresh_storm, question):
+    cust = chat(client, question, f"aud-c-{question}", premise=DEMO_PREMISE)
+    ops = chat(client, question, f"aud-o-{question}", premise=DEMO_PREMISE, audience="operations")
+    assert cust["reply"] != ops["reply"] and _numbers(cust["reply"]) == _numbers(ops["reply"])
+    assert "Your" in cust["reply"] or "your" in cust["reply"]
+    assert "your" not in ops["reply"].lower().split("(")[0]  # third person in the lead finding
+    assert ops["confidence"] == cust["confidence"]
+
+
+def test_ops_refusal_and_default_audience(client, fresh_storm):
+    r = chat(client, "Where are the crews right now?", "aud-refuse", premise=DEMO_PREMISE, audience="operations")
+    assert "dispatch" in r["reply"] and "refuse_crews" not in r["reply"]
+    default = chat(client, "Where are the crews right now?", "aud-default", premise=DEMO_PREMISE)
+    assert default["reply"].startswith("I can't share crew locations")
+    assert client.post("/chat", json={"message": "hi", "audience": "boss"}).status_code == 422
+
+
+def test_prompts_share_rules():
+    from assistant import BASE_RULES, PROMPTS
+    assert all(BASE_RULES in p for p in PROMPTS.values())
+    assert "warm" in PROMPTS["customer"] and "professional" in PROMPTS["operations"]

@@ -20,6 +20,7 @@ import re
 from dataclasses import dataclass, field
 from pathlib import Path
 
+import regional
 from guidance import DECLARED_NEEDS
 
 MAX_TOOL_CALLS = 5
@@ -34,10 +35,8 @@ PROVIDERS = {
                "gemini-2.0-flash"),
 }
 
-SYSTEM_PROMPT = """You are AEP's AI Outage Concierge, helping one residential customer.
-
-Rules you must always follow:
-- Answer the customer's question directly in 1-3 short, plain sentences. No headings, no bullet lists.
+BASE_RULES = """Rules you must always follow:
+- Answer the question directly in 1-3 short, plain sentences. No headings, no bullet lists.
 - Never state a number, time, percentage or probability that did not come from a tool result in this conversation. If you need a number, call a tool.
 - Do not list contributing factors, confidence levels or missing data: the app shows those separately.
 - Outage chance and restoration times are model estimates: say "about", "most likely" and give the likely range for repair times. Don't mention percentiles.
@@ -52,6 +51,22 @@ Rules you must always follow:
 - Don't give phone numbers or web addresses; say "report it to AEP". For danger, say "call 911".
 - Add one safety sentence only when it is relevant to the question.
 """
+
+CUSTOMER_PROMPT = """You are AEP's AI Outage Concierge, helping one residential customer.
+
+""" + BASE_RULES + """
+Tone: warm, friendly customer service. Speak to the customer as "you" and "your home". If they sound worried, briefly acknowledge it. Use everyday words, no utility jargon. When it helps, end with one practical next step.
+"""
+
+OPS_PROMPT = """You are AEP's AI Outage Concierge in the internal AEP Operations workspace, briefing AEP staff (operations and customer-facing teams) about one customer location they are reviewing.
+
+""" + BASE_RULES + """
+Tone: professional and businesslike. Lead with the finding, in the third person ("the premise", "the customer", "affected customers"). Be concise and precise; operational terms are fine (risk band, crew-hours, upstream device, bottleneck, step restoration). No greetings, reassurance or exclamation marks. Never use percentile labels such as P10, P50 or P90: say "most likely" and give the range.
+"""
+
+SYSTEM_PROMPT = CUSTOMER_PROMPT  # backwards-compatible name
+PROMPTS = {"customer": CUSTOMER_PROMPT, "operations": OPS_PROMPT}
+AUDIENCES = tuple(PROMPTS)
 
 _DAY = {"type": ["integer", "null"], "minimum": 0, "maximum": 6,
         "description": "Forecast day: 0 = today ... 6. Omit to use the customer's current setting."}
@@ -120,6 +135,7 @@ class Session:
     needs: list = field(default_factory=list)
     storm: dict | None = None  # the customer's map setting: forecast day or replay
     outage: dict | None = None  # Outage test tab: the simulated fault (confirmed outage for this session)
+    audience: str = "customer"  # customer (friendly service voice) | operations (internal, businesslike)
     last_estimate: dict | None = None
     last_results: dict = field(default_factory=dict)
     history: list = field(default_factory=list)
@@ -252,8 +268,11 @@ class Assistant:
 
     def chat(self, message: str, session_id: str = "default", premise: str | None = None,
              declared_needs: list[str] | None = None, demo_safe: bool = False, storm: dict | None = None,
-             outage: dict | None = None) -> dict:
+             outage: dict | None = None, audience: str = "customer") -> dict:
+        if audience not in AUDIENCES:
+            raise ValueError(f"audience must be one of {AUDIENCES}")
         s = self.sessions.setdefault(session_id, Session())
+        s.audience = audience
         if premise:
             s.premise = str(premise)
         if declared_needs is not None:
@@ -265,7 +284,7 @@ class Assistant:
         s.needs += newly_declared
 
         if demo_safe:
-            cached = self.cache.get(self.cache_key(message, s.storm))
+            cached = self.cache.get(self.cache_key(message, s.storm, s.audience))
             if cached:
                 return {**cached, "mode": "demo_cache"}
         providers = self._providers()
@@ -278,12 +297,13 @@ class Assistant:
                 return result
         return self._offline_turn(s, message, newly_declared)
 
-    def cache_key(self, message: str, storm: dict | None = None) -> str:
+    def cache_key(self, message: str, storm: dict | None = None, audience: str = "customer") -> str:
         mode = (storm or {}).get("mode")
         tag = ("replay" if mode == "replay"
                else "sandbox" + "-".join(str((storm or {}).get(k)) for k in ("intensity", "crews", "duration_days"))
                if mode == "sandbox" else f"day{(storm or {}).get('day', 'auto')}")
-        return f"{self.storm.step}|{tag}|{re.sub(r'[^a-z0-9 ]', '', message.lower()).strip()}"
+        aud = "" if audience == "customer" else f"{audience}|"
+        return f"{aud}{self.storm.step}|{tag}|{re.sub(r'[^a-z0-9 ]', '', message.lower()).strip()}"
 
     # ---- providers ----
 
@@ -364,16 +384,20 @@ class Assistant:
                      f"{rec['location']}; reported {rec['reported_display']}). Their power is out now. "
                      f"Call estimate_restoration for the expected fix time.")
         needs = "; ".join("they " + DECLARED_NEEDS[n] for n in s.needs) or "none"
+        where = ("the customer's home is identified" if not regional.is_regional(s.premise) else
+                 "the location is OUTSIDE AEP's challenge data, so outage-chance and repair answers are regional "
+                 "typical values for similar AEP-area homes; say so plainly and don't present them as specific to "
+                 "this home")
         return [
             {"role": "system", "content": f"Confirmed by AEP right now (nothing else is confirmed): {facts}"},
-            {"role": "system", "content": f"Background: the customer's home is identified. What the customer told "
+            {"role": "system", "content": f"Background: {where}. What the customer told "
                                           f"you about their needs: {needs}."},
         ]
 
     def _llm_turn(self, s: Session, message: str, providers: list[str], newly_declared: list[str]) -> dict:
         if not s.premise:
             return self._offline_turn(s, message, newly_declared)
-        messages = [{"role": "system", "content": SYSTEM_PROMPT},
+        messages = [{"role": "system", "content": PROMPTS[s.audience]},
                     *self._context_notes(s),
                     *s.history[-2 * HISTORY_TURNS:],
                     {"role": "user", "content": message}]
@@ -435,7 +459,8 @@ class Assistant:
         escalation = next((r for r in results if isinstance(r, dict) and r.get("escalate_to_human")), None)
         if ok and escalation and "callback" not in reply.lower():  # safety-relevant: never left to LLM variance
             reply += (" Under AEP's alert rules you qualify for a callback from a representative. "
-                      "If anyone is in danger, call 911.")
+                      "If anyone is in danger, call 911." if s.audience == "customer" else
+                      " Under the alert rules the customer qualifies for a representative callback (escalation).")
         if not ok or not reply:
             result = self._offline_turn(s, message, newly_declared)
             result["note"] = f"LLM reply replaced: ungrounded numbers {bad}" if reply else "LLM returned no text"
@@ -449,28 +474,44 @@ class Assistant:
 
     def _offline_turn(self, s: Session, message: str, newly_declared: list[str]) -> dict:
         intents = detect_intents(message)
+        ops = s.audience == "operations"
 
         if "refuse_crews" in intents:
-            return self._finish(s, message, "I can't share crew locations or assignments; that keeps crews safe and "
-                                "lets them work without interruption. I can tell you how long repairs near you "
-                                "are likely to take instead.", intents, [], [], fallback=False)
+            return self._finish(s, message, (
+                "Crew locations and assignments aren't available through this assistant; they stay in dispatch "
+                "systems for crew safety. A restoration-time estimate for this location is available instead." if ops else
+                "I can't share crew locations or assignments; that keeps crews safe and "
+                "lets them work without interruption. I can tell you how long repairs near you "
+                "are likely to take instead."), intents, [], [], fallback=False)
         if "refuse_others" in intents:
-            return self._finish(s, message, "I can only share information about your own home. I can't share "
-                                "details about other customers, medical registries, or critical facilities such as "
-                                "hospitals, to protect privacy and safety.", intents, [], [], fallback=False)
+            return self._finish(s, message, (
+                "This assistant covers the selected location only. Other customers' details, medical-registry status "
+                "and critical-facility information are excluded for privacy and safety; area-level facility risk is "
+                "on the Operations dashboard." if ops else
+                "I can only share information about your own home. I can't share "
+                "details about other customers, medical registries, or critical facilities such as "
+                "hospitals, to protect privacy and safety."), intents, [], [], fallback=False)
         if not s.premise:
-            return self._finish(s, message, "Please find your home first so I can check your outage risk. If you see "
-                                "a downed line, stay 35 feet away and call 911.", intents, [], [], fallback=True)
+            return self._finish(s, message, (
+                "Select a customer location first to run an estimate." if ops else
+                "Please find your home first so I can check your outage risk. If you see "
+                "a downed line, stay 35 feet away and call 911."), intents, [], [], fallback=True)
         rec = self._outage_record(s)
         if rec and rec["affects_you"] and "risk" in intents and not {"restoration", "what_if"} & set(intents):
             e = self._run_tool(s, "estimate_restoration", {}, None)
-            return self._finish(s, message, f"Yes: your power is out right now ({rec['cause'].lower()}, reported "
-                                f"{rec['reported_display']}). It should most likely be back by {e['most_likely_fixed_by']}.",
-                                ["restoration"], ["outage_restoration"], [e], fallback=False)
+            return self._finish(s, message, (
+                f"Confirmed outage at the premise: {rec['cause'].lower()}, reported {rec['reported_display']}. "
+                f"Most likely restoration: {e['most_likely_fixed_by']}." if ops else
+                f"Yes, I'm sorry: your power is out right now ({rec['cause'].lower()}, reported "
+                f"{rec['reported_display']}). It should most likely be back by {e['most_likely_fixed_by']}."),
+                ["restoration"], ["outage_restoration"], [e], fallback=False)
         if self.storm.restored_for(s.premise) and not set(intents) - {"restoration", "risk", "what_if"}:
-            return self._finish(s, message, "Yes: power has been restored to your home. If yours is still out, "
-                                "report it to AEP; it may be a separate problem at your home.",
-                                intents, [], [], fallback=False)
+            return self._finish(s, message, (
+                "Power is restored at the premise. If the customer still reports no power, treat it as a separate "
+                "service issue." if ops else
+                "Good news: power has been restored to your home. If yours is still out, "
+                "report it to AEP; it may be a separate problem at your home."),
+                intents, [], [], fallback=False)
         if newly_declared and not intents:
             intents = ["prep", "alerts"]
         if not intents:
@@ -488,10 +529,24 @@ class Assistant:
                 return self._unknown_location(s, message, intents, tools_used, results)
             st = r["storm"]
             worst = st.get("mode") == "forecast" and day is None and (s.storm or {}).get("day") is None
-            sentences.append(
-                f"Your chance of losing power {st.get('when') or 'in this storm'} is {r['risk_band'].lower()}: "
-                f"{pct(r['probability'])}" + (", the riskiest day in this week's forecast." if worst else ".")
-                + (" This is a hypothetical storm, not the forecast." if st.get("hypothetical") else ""))
+            if ops:
+                sentences.append(
+                    f"Outage risk {st.get('when') or 'in this storm'}: {r['risk_band']} ({pct(r['probability'])})"
+                    + (", the highest-risk day in this week's forecast." if worst else ".")
+                    + (" The scenario is hypothetical, not forecast." if st.get("hypothetical") else ""))
+            else:
+                sentences.append(
+                    f"Your chance of losing power {st.get('when') or 'in this storm'} is {r['risk_band'].lower()}: "
+                    f"{pct(r['probability'])}" + (", the riskiest day in this week's forecast." if worst else ".")
+                    + (" This is a hypothetical storm, not the forecast." if st.get("hypothetical") else "")
+                    + (" It's a good time to charge your phone and check your flashlights."
+                       if r["risk_band"] in ("High", "Very High") and "prep" not in intents else ""))
+            if r.get("scope") == "regional":
+                sentences.append(
+                    "Regional estimate: the location is outside AEP's challenge data, so this is the typical value "
+                    "for comparable AEP-area homes (low confidence)." if ops else
+                    "Because this location is outside AEP's data, that's a typical value for similar homes in AEP's "
+                    "area, not a prediction for your specific home.")
         if "restoration" in intents or "what_if" in intents:
             overrides = parse_what_if(message, self.storm.scenario()) if "what_if" in intents else {}
             if "what_if" in intents and s.last_estimate is None:
@@ -501,10 +556,20 @@ class Assistant:
             results.append(e)
             if e.get("fallback"):
                 return self._unknown_location(s, message, intents, tools_used, results)
-            if e.get("outage_confirmed"):
-                text = (f"Your outage ({e['cause'].lower()}) was reported {e['reported']}. Power should most likely "
-                        f"be back by {e['most_likely_fixed_by']} (likely between {e['fixed_between'][0]} and "
-                        f"{e['fixed_between'][1]}), about {e['p50_hrs']:g} hours after it was reported.")
+            if e.get("outage_confirmed") and ops:
+                text = (f"Confirmed outage ({e['cause'].lower()}), reported {e['reported']}. Most likely restored by "
+                        f"{e['most_likely_fixed_by']} (range {e['fixed_between'][0]} to {e['fixed_between'][1]}); "
+                        f"about {e['p50_hrs']:g} hours from report.")
+            elif e.get("outage_confirmed"):
+                text = (f"I'm sorry your power is out. Your outage ({e['cause'].lower()}) was reported {e['reported']}. "
+                        f"Power should most likely be back by {e['most_likely_fixed_by']} (likely between "
+                        f"{e['fixed_between'][0]} and {e['fixed_between'][1]}), about {e['p50_hrs']:g} hours after it "
+                        "was reported.")
+            elif ops:
+                lead = ("Outage confirmed at the premise; estimated restoration" if self.storm.outage_for(s.premise)
+                        else "Estimated restoration if an outage occurs")
+                text = (f"{lead}: most likely about {e['p50_hrs']:g} hours (range {e['p10_hrs']:g}-{e['p90_hrs']:g} "
+                        "hours)" + (f"; the bottleneck is {e['bottleneck_device']}." if e.get("bottleneck_device") else "."))
             else:
                 lead = ("Your outage is confirmed; power" if self.storm.outage_for(s.premise)
                         else "If your power goes out, it")
@@ -512,8 +577,13 @@ class Assistant:
                         f"(likely {e['p10_hrs']:g}-{e['p90_hrs']:g} hours).")
             ch = e.get("change_vs_previous")
             if ch and ch["p50_change_hrs"]:
-                text += (f" That's {abs(ch['p50_change_hrs']):g} hours "
+                text += (f" That is {abs(ch['p50_change_hrs']):g} hours "
+                         f"{'later' if ch['p50_change_hrs'] > 0 else 'sooner'} than the previous estimate." if ops else
+                         f" That's {abs(ch['p50_change_hrs']):g} hours "
                          f"{'later' if ch['p50_change_hrs'] > 0 else 'sooner'} than before.")
+            if e.get("scope") == "regional" and "risk" not in intents:
+                text += (" Regional estimate: the location is outside AEP's challenge data (low confidence)." if ops
+                         else " This location is outside AEP's data, so that's based on similar homes in AEP's area.")
             sentences.append(text)
         if "prep" in intents or newly_declared:
             g = self._run_tool(s, "prep_guidance", {}, None)
@@ -521,24 +591,33 @@ class Assistant:
             results.append(g)
             need_items = [a["text"] for a in g["actions"] if a["why"].startswith("you told us")]
             top = need_items[:1] + [a["text"] for a in g["actions"] if a["text"] not in need_items][:2]
-            sentences.append(("Thanks for telling me. " if newly_declared else "") + " ".join(top))
+            sentences.append("Recommended customer actions: " + " ".join(top) if ops else
+                             ("Thanks for telling me. " if newly_declared else "") + " ".join(top))
         if "alerts" in intents or newly_declared:
             a = self._run_tool(s, "check_alert_eligibility", {}, None)
             tools_used.append("check_alert_eligibility")
             results.append(a)
             if a["escalate_to_human"]:
-                sentences.append("Under AEP's alert rules you qualify for a callback from a representative; "
-                                 "I can't schedule it myself. If anyone is in danger, call 911.")
+                sentences.append(
+                    "Escalation: under the alert rules the customer qualifies for a representative callback; route it "
+                    "through the standard callback process." if ops else
+                    "Under AEP's alert rules you qualify for a callback from a representative; "
+                    "I can't schedule it myself. If anyone is in danger, call 911.")
             elif a["rules_fired"]:
                 rule = a["rules_fired"][0]
-                sentences.append(f"Yes, you qualify: {rule['action'].lower()} by {rule['channel']} "
-                                 f"({rule['timing'].lower()}).")
+                sentences.append(
+                    f"Alert eligibility: yes. {rule['action']} by {rule['channel']} ({rule['timing'].lower()})." if ops else
+                    f"Yes, you qualify: {rule['action'].lower()} by {rule['channel']} ({rule['timing'].lower()}).")
             else:
-                sentences.append("No automatic alert applies right now, but you can sign up for outage texts.")
+                sentences.append("No automatic alert rule applies at this point; the customer can opt in to outage "
+                                 "texts." if ops else
+                                 "No automatic alert applies right now, but you can sign up for outage texts.")
         return self._finish(s, message, " ".join(sentences), intents, tools_used, results, fallback=False)
 
     def _unknown_location(self, s, message, intents, tools_used, results) -> dict:
-        reply = ("I couldn't find your home in our records, so I can't give a reliable estimate. If you see a "
+        reply = ("No service record matched this location, so no reliable estimate is available; standard storm "
+                 "safety guidance applies." if s.audience == "operations" else
+                 "I couldn't find your home in our records, so I can't give a reliable estimate. If you see a "
                  "downed line, stay 35 feet away and call 911, and report any outage to AEP.")
         return self._finish(s, message, reply, intents, tools_used, results, fallback=True)
 

@@ -1,0 +1,425 @@
+{
+  "risk": {
+    "folds": [
+      "minor_events",
+      "storm_2024-09",
+      "storm_2025-01",
+      "storm_2025-02"
+    ],
+    "results": {
+      "baseline_lr": {
+        "minor_events": {
+          "positives": 158,
+          "base_rate": 1.4816373555661459e-05,
+          "pr_auc": 9.176926143541038e-05,
+          "pr_auc_lift": 6.193773468970387,
+          "roc_auc": 0.833005725030907,
+          "brier": 1.5162663532470566e-05,
+          "recall_top1pct": 0.06329113924050633,
+          "recall_top5pct": 0.37341772151898733
+        },
+        "storm_2024-09": {
+          "positives": 190,
+          "base_rate": 0.0005705534368337287,
+          "pr_auc": 0.0023088376061537693,
+          "pr_auc_lift": 4.046663216975088,
+          "roc_auc": 0.7647912574838935,
+          "brier": 0.0005704928154668743,
+          "recall_top1pct": 0.042105263157894736,
+          "recall_top5pct": 0.3
+        },
+        "storm_2025-01": {
+          "positives": 46,
+          "base_rate": 0.00013813398997027115,
+          "pr_auc": 0.002009951087538542,
+          "pr_auc_lift": 14.550735036113258,
+          "roc_auc": 0.8405671418714545,
+          "brier": 0.00013812404879181244,
+          "recall_top1pct": 0.21739130434782608,
+          "recall_top5pct": 0.3695652173913043
+        },
+        "storm_2025-02": {
+          "positives": 1169,
+          "base_rate": 0.003510405092940152,
+          "pr_auc": 0.02197401100028567,
+          "pr_auc_lift": 6.259679557917135,
+          "roc_auc": 0.7945409167415659,
+          "brier": 0.0034719295748278354,
+          "recall_top1pct": 0.09666381522668947,
+          "recall_top5pct": 0.32164242942686055
+        },
+        "mean": {
+          "positives": 390.75,
+          "base_rate": 0.0010584772233249533,
+          "pr_auc": 0.006596142238853348,
+          "pr_auc_lift": 7.7627128199939675,
+          "roc_auc": 0.8082262602819552,
+          "brier": 0.0010489272756547482,
+          "recall_top1pct": 0.10486288049322916,
+          "recall_top5pct": 0.341156342084288
+        }
+      },
+      "physics_lr": {
+        "minor_events": {
+          "positives": 158,
+          "base_rate": 1.4816373555661459e-05,
+          "pr_auc": 9.944131338153604e-05,
+          "pr_auc_lift": 6.7115824940535935,
+          "roc_auc": 0.8215922833018064,
+          "brier": 1.5127537972310011e-05,
+          "recall_top1pct": 0.056962025316455694,
+          "recall_top5pct": 0.3987341772151899
+        },
+        "storm_2024-09": {
+          "positives": 190,
+          "base_rate": 0.0005705534368337287,
+          "pr_auc": 0.002400430557558282,
+          "pr_auc_lift": 4.207196736697282,
+          "roc_auc": 0.765452813121681,
+          "brier": 0.0005704777929037225,
+          "recall_top1pct": 0.05263157894736842,
+          "recall_top5pct": 0.3157894736842105
+        },
+        "storm_2025-01": {
+          "positives": 46,
+          "base_rate": 0.00013813398997027115,
+          "pr_auc": 0.0016976074585223662,
+          "pr_auc_lift": 12.289570864402895,
+          "roc_auc": 0.8422236076703422,
+          "brier": 0.00013812069225869103,
+          "recall_top1pct": 0.1956521739130435,
+          "recall_top5pct": 0.43478260869565216
+        },
+        "storm_2025-02": {
+          "positives": 1169,
+          "base_rate": 0.003510405092940152,
+          "pr_auc": 0.02267624728163372,
+          "pr_auc_lift": 6.459723787217147,
+          "roc_auc": 0.7882511440846418,
+          "brier": 0.0034824768555754377,
+          "recall_top1pct": 0.09409751924721985,
+          "recall_top5pct": 0.30538922155688625
+        },
+        "mean": {
+          "positives": 390.75,
+          "base_rate": 0.0010584772233249533,
+          "pr_auc": 0.006718431652773976,
+          "pr_auc_lift": 7.417018470592729,
+          "roc_auc": 0.8043799620446179,
+          "brier": 0.0010515507196775403,
+          "recall_top1pct": 0.09983582435602187,
+          "recall_top5pct": 0.3636738702879847
+        }
+      },
+      "lgbm_monotone": {
+        "minor_events": {
+          "positives": 158,
+          "base_rate": 1.4816373555661459e-05,
+          "pr_auc": 7.144966957149439e-05,
+          "pr_auc_lift": 4.8223453129792935,
+          "roc_auc": 0.7573892030553186,
+          "brier": 1.6143901440404443e-05,
+          "recall_top1pct": 0.0949367088607595,
+          "recall_top5pct": 0.25949367088607594
+        },
+        "storm_2024-09": {
+          "positives": 190,
+          "base_rate": 0.0005705534368337287,
+          "pr_auc": 0.0014883138938141984,
+          "pr_auc_lift": 2.6085442619950854,
+          "roc_auc": 0.7401716353711031,
+          "brier": 0.0005830644685419046,
+          "recall_top1pct": 0.042105263157894736,
+          "recall_top5pct": 0.15263157894736842
+        },
+        "storm_2025-01": {
+          "positives": 46,
+          "base_rate": 0.00013813398997027115,
+          "pr_auc": 0.002382270307695683,
+          "pr_auc_lift": 17.246083373168247,
+          "roc_auc": 0.8066468734314142,
+          "brier": 0.00013811490586489527,
+          "recall_top1pct": 0.17391304347826086,
+          "recall_top5pct": 0.3695652173913043
+        },
+        "storm_2025-02": {
+          "positives": 1169,
+          "base_rate": 0.003510405092940152,
+          "pr_auc": 0.024762602393240993,
+          "pr_auc_lift": 7.054058360113929,
+          "roc_auc": 0.814420142296136,
+          "brier": 0.00413077493416327,
+          "recall_top1pct": 0.11120615911035073,
+          "recall_top5pct": 0.41659538066723695
+        },
+        "mean": {
+          "positives": 390.75,
+          "base_rate": 0.0010584772233249533,
+          "pr_auc": 0.007176159066080592,
+          "pr_auc_lift": 7.932757827064139,
+          "roc_auc": 0.7796569635384929,
+          "brier": 0.0012170245525026187,
+          "recall_top1pct": 0.10554029365181644,
+          "recall_top5pct": 0.2995714619729964
+        }
+      },
+      "ensemble": {
+        "minor_events": {
+          "positives": 158,
+          "base_rate": 1.4816373555661459e-05,
+          "pr_auc": 7.440486789148833e-05,
+          "pr_auc_lift": 5.021800213930056,
+          "roc_auc": 0.7677439622917349,
+          "brier": 1.5472864287474956e-05,
+          "recall_top1pct": 0.10126582278481013,
+          "recall_top5pct": 0.2848101265822785
+        },
+        "storm_2024-09": {
+          "positives": 190,
+          "base_rate": 0.0005705534368337287,
+          "pr_auc": 0.0022070122280539923,
+          "pr_auc_lift": 3.8681954845487367,
+          "roc_auc": 0.7685570989850685,
+          "brier": 0.0005736409715966129,
+          "recall_top1pct": 0.05789473684210526,
+          "recall_top5pct": 0.29473684210526313
+        },
+        "storm_2025-01": {
+          "positives": 46,
+          "base_rate": 0.00013813398997027115,
+          "pr_auc": 0.0020129034815219307,
+          "pr_auc_lift": 14.572108443078656,
+          "roc_auc": 0.8415666623836603,
+          "brier": 0.00013811661343402165,
+          "recall_top1pct": 0.21739130434782608,
+          "recall_top5pct": 0.3695652173913043
+        },
+        "storm_2025-02": {
+          "positives": 1169,
+          "base_rate": 0.003510405092940152,
+          "pr_auc": 0.02249910757390955,
+          "pr_auc_lift": 6.409262457816611,
+          "roc_auc": 0.7966496750176373,
+          "brier": 0.0036073263661212736,
+          "recall_top1pct": 0.11890504704875962,
+          "recall_top5pct": 0.33875106928999144
+        },
+        "members": [
+          "baseline_lr",
+          "lgbm_monotone"
+        ],
+        "mean": {
+          "positives": 390.75,
+          "base_rate": 0.0010584772233249533,
+          "pr_auc": 0.00669835703784424,
+          "pr_auc_lift": 7.467841649843514,
+          "roc_auc": 0.7936293496695253,
+          "brier": 0.0010836392038598458,
+          "recall_top1pct": 0.12386422775587527,
+          "recall_top5pct": 0.32196581384220935
+        }
+      }
+    },
+    "lgbm_params": {
+      "minor_events": {
+        "num_leaves": 15,
+        "min_child_samples": 200
+      },
+      "storm_2024-09": {
+        "num_leaves": 7,
+        "min_child_samples": 200
+      },
+      "storm_2025-01": {
+        "num_leaves": 7,
+        "min_child_samples": 200
+      },
+      "storm_2025-02": {
+        "num_leaves": 7,
+        "min_child_samples": 200
+      }
+    }
+  },
+  "verdict": {
+    "physics_lr": {
+      "checks": {
+        "lift_gain": false,
+        "brier_not_worse": false,
+        "roc_auc_ok": true,
+        "feb2025_not_worse": true
+      },
+      "adopt": false,
+      "lift_change": -0.04453267271601935
+    },
+    "lgbm_monotone": {
+      "checks": {
+        "lift_gain": false,
+        "brier_not_worse": false,
+        "roc_auc_ok": false,
+        "feb2025_not_worse": true
+      },
+      "adopt": false,
+      "lift_change": 0.021905358476252745
+    },
+    "ensemble": {
+      "checks": {
+        "lift_gain": false,
+        "brier_not_worse": false,
+        "roc_auc_ok": false,
+        "feb2025_not_worse": true
+      },
+      "adopt": false,
+      "lift_change": -0.03798558274511599
+    }
+  },
+  "duration": {
+    "folds": {
+      "minor_events": {
+        "baseline_constant": {
+          "n": 134,
+          "coverage": 0.48507462686567165,
+          "pinball_q10": 4.81044776119403,
+          "pinball_q50": 23.66417910447761,
+          "pinball_q90": 31.419402985074626
+        },
+        "current_lgbm": {
+          "n": 134,
+          "coverage": 0.41044776119402987,
+          "pinball_q10": 4.81044776119403,
+          "pinball_q50": 23.658588645212216,
+          "pinball_q90": 33.94994086267531
+        },
+        "lgbm_storm_weather": {
+          "n": 134,
+          "coverage": 0.4925373134328358,
+          "pinball_q10": 4.822387479535354,
+          "pinball_q50": 20.99256489021634,
+          "pinball_q90": 26.171298714103564
+        },
+        "weibull_aft_censored": {
+          "n": 134,
+          "coverage": 0.9402985074626866,
+          "pinball_q10": 4.958569346329745,
+          "pinball_q50": 36.647331167911275,
+          "pinball_q90": 62.99914314972921
+        }
+      },
+      "storm_2024-09": {
+        "baseline_constant": {
+          "n": 194,
+          "coverage": 0.2268041237113402,
+          "pinball_q10": 1.9123711340206189,
+          "pinball_q50": 9.1340206185567,
+          "pinball_q90": 13.41237113402062
+        },
+        "current_lgbm": {
+          "n": 194,
+          "coverage": 0.3402061855670103,
+          "pinball_q10": 1.9123711340206189,
+          "pinball_q50": 9.177120383450342,
+          "pinball_q90": 10.657472061972816
+        },
+        "lgbm_storm_weather": {
+          "n": 194,
+          "coverage": 0.2268041237113402,
+          "pinball_q10": 1.8761476107595894,
+          "pinball_q50": 8.437806446343062,
+          "pinball_q90": 10.879044634209755
+        },
+        "weibull_aft_censored": {
+          "n": 194,
+          "coverage": 0.9948453608247423,
+          "pinball_q10": 1.9674893461812963,
+          "pinball_q50": 10.357961506499558,
+          "pinball_q90": 13.58656834007414
+        }
+      },
+      "storm_2025-01": {
+        "baseline_constant": {
+          "n": 46,
+          "coverage": 0.8478260869565217,
+          "pinball_q10": 1.7434782608695647,
+          "pinball_q50": 8.282608695652174,
+          "pinball_q90": 2.382608695652174
+        },
+        "current_lgbm": {
+          "n": 46,
+          "coverage": 0.7391304347826086,
+          "pinball_q10": 1.7434782608695647,
+          "pinball_q50": 8.277607429900147,
+          "pinball_q90": 4.846332427321043
+        },
+        "lgbm_storm_weather": {
+          "n": 46,
+          "coverage": 0.3695652173913043,
+          "pinball_q10": 1.7086973422231009,
+          "pinball_q50": 4.339423798451756,
+          "pinball_q90": 6.543167218538513
+        },
+        "weibull_aft_censored": {
+          "n": 46,
+          "coverage": 0.9782608695652174,
+          "pinball_q10": 1.774521569219769,
+          "pinball_q50": 12.450382694061513,
+          "pinball_q90": 28.607328944818843
+        }
+      },
+      "storm_2025-02": {
+        "baseline_constant": {
+          "n": 1209,
+          "coverage": 0.6095947063688999,
+          "pinball_q10": 0.4305210918114144,
+          "pinball_q50": 11.06989247311828,
+          "pinball_q90": 6.794706368899915
+        },
+        "current_lgbm": {
+          "n": 1209,
+          "coverage": 0.5252274607113316,
+          "pinball_q10": 0.8304025889135073,
+          "pinball_q50": 11.145434400122399,
+          "pinball_q90": 6.410731823594242
+        },
+        "lgbm_storm_weather": {
+          "n": 1209,
+          "coverage": 0.6095947063688999,
+          "pinball_q10": 0.6469922318726338,
+          "pinball_q50": 13.008499404350204,
+          "pinball_q90": 2.700591272813395
+        },
+        "weibull_aft_censored": {
+          "n": 1209,
+          "coverage": 0.9966914805624483,
+          "pinball_q10": 0.19677154609451628,
+          "pinball_q50": 1.1822904258397613,
+          "pinball_q90": 1.5675288900252733
+        }
+      }
+    },
+    "mean": {
+      "baseline_constant": {
+        "coverage": 0.5423248859756084,
+        "pinball_q10": 2.224204561973907,
+        "pinball_q50": 13.037675222951192,
+        "pinball_q90": 13.502272295911833
+      },
+      "current_lgbm": {
+        "coverage": 0.5037529605637452,
+        "pinball_q10": 2.32417493624943,
+        "pinball_q50": 13.064687714671276,
+        "pinball_q90": 13.966119293890854
+      },
+      "lgbm_storm_weather": {
+        "coverage": 0.424625340226095,
+        "pinball_q10": 2.2635561660976693,
+        "pinball_q50": 11.69457363484034,
+        "pinball_q90": 11.573525459916308
+      },
+      "weibull_aft_censored": {
+        "coverage": 0.9775240546037737,
+        "pinball_q10": 2.2243379519563313,
+        "pinball_q50": 15.159491448578025,
+        "pinball_q90": 26.690142331161866
+      }
+    },
+    "n_censored": 76
+  }
+}

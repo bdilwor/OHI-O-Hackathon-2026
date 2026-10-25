@@ -182,19 +182,24 @@ Replaced parts count removal + install hours; new connectors count install only.
 
 ## Forecast bridge (`backend/forecast.py`)
 - **Source:** Open-Meteo daily forecast (free, no key), today plus 6 days, for the customer's home. Cached for 1 hour. If the API can't be reached, the app assumes calm weather and lowers confidence.
-- **Why a bridge is needed:** the risk model was trained on *storm size* (damage reports across the area), not on weather. Each forecast day's peak wind gust is mapped to a storm size by log-interpolating these anchors:
+- **Why a bridge is needed:** the risk model was trained on *storm size* (damage reports across the area), not on weather. Each forecast day's peak wind gust is mapped to an expected storm size.
+- **Fitted on real weather (`ml/weather.py`):** ERA5 daily peak gusts (Open-Meteo archive, 3×3 grid over the service area, cached in `artifacts/weather.parquet`) for all 35 storms and 1,175 quiet days. A Poisson regression of storm size on peak gust gives E[reports] = exp(−7.754 + 0.2647 × (gust − 15)), an exponential fragility curve (wind pressure grows with the square of speed).
+- **Validation:** each storm held out on its own, quiet days in 5 folds (`artifacts/hazard_curve.json`). The fitted curve beat the earlier hand-set anchors: Poisson deviance 13.5k vs 25.3k, storm-day log error 1.19 vs 1.81, and over the whole record it expects 2,043 reports (actual 1,659) where the old anchors expected 12,554.
+- **Anchors used by the app** (log-interpolated; capped at the largest storm on record):
 
-| Peak gust | Expected damage reports | Anchor |
-|---|---|---|
-| ≤ 20 mph | 0.5 | calm |
-| 30 mph | 2 | breezy |
-| 40 mph | 12 | median minor event in our data |
-| 50 mph | 60 | |
-| 58 mph (NWS "severe") | 194 | the September 2024 storm |
-| ≥ 70 mph | 1,254 | the February 2025 storm |
+| Peak gust | Expected damage reports |
+|---|---|
+| 20 mph | 0.002 |
+| 30 mph | 0.02 |
+| 40 mph | 0.32 |
+| 50 mph | 4.5 |
+| 58 mph | 38 |
+| 65 mph | 240 |
+| ≥ 71.2 mph | 1,254 (the February 2025 storm) |
 
+- **Not fitted:** ERA5 daily weather codes never report freezing rain or thunderstorms here, and rain alone fitted with a physically implausible negative sign, so these keep their documented judgment multipliers below.
 - **Multipliers (capped at 2,000):** freezing rain or ≥ 4 in of snow ×4; thunderstorms ×2; ≥ 2 in of rain ×1.5.
-- **Limits:** this is a transparent, judgment-based bridge, not a fitted weather model. Real storms vary in track, duration and tree loading. The confidence meter reflects forecast lead time.
+- **Limits:** gust alone explains only part of a storm's damage (the Feb 2025 storm peaked at 59 mph in ERA5; a 63 mph day produced 11 reports). Real storms vary in track, duration and tree loading. The confidence meter reflects forecast lead time.
 - **Replay:** a "storm like Feb 2025" uses the historical storm size (1,254 reports) and is always labeled hypothetical.
 
 ## Continuous storm size (`ml/score.py: p_at`)
@@ -222,7 +227,7 @@ Replaced parts count removal + install hours; new connectors count install only.
   - **Outage chance:** the forecast driver, the top model factor, and local damage history.
   - **Repair time:** the bottleneck device, crew count and arrival, and fallen trees or blocked roads.
 
-## Storm test (testing only, `backend/tools.py: sandbox_storm`)
+## Simulated storm (Operations page, testing only, `backend/tools.py: sandbox_storm`)
 - **Intensity 1–5 maps to storm size** (expected area damage reports): 12, 60, 194 (Sep 2024 size), 600, 1,254 (Feb 2025 size).
 - **Duration:** multiplies storm size by `1 + 0.35 × (days − 1)` (capped at 2,000). Crews arrive after `12 h × days`, once the storm passes.
 - **Affected area:** a circle centered on the home. Equipment outside it gets calm-weather risk (storm size 0.5).
@@ -232,9 +237,9 @@ Replaced parts count removal + install hours; new connectors count install only.
 ## Map visuals
 - **Yard trees:** placed around real house positions (0–2 per house, 14–24 m away) and in any OSM residential areas. Their exact spots are illustrative. Wooded-area trees follow real OSM polygons.
 - **Windows:** go dark and a red ring pulses when a home's predicted outage chance is 50% or more.
-- **Rain and tree sway:** scale with the forecast gusts, or with the Storm test intensity.
+- **Rain and tree sway:** scale with the forecast gusts, or with the simulated storm intensity.
 
-## Outages (`backend/outages.py`: outage panel and Outage test)
+## Outages (`backend/outages.py`: outage panel and the Operations outage test)
 - **Fault → protective device:**
   - A picked device (transformer, fuse, recloser on the home's supply path) is used directly.
   - A map click snaps to the nearest equipment within 40 m (farther away, the user is asked to click closer).
@@ -260,3 +265,30 @@ Replaced parts count removal + install hours; new connectors count install only.
   - AEP's 4.5× indirect-labor factor
 - **Current outage (My home):** the outage feed is the demo storm timeline. It uses the timeline's assessed damage, crews and hours since the outage, and applies only to the demo home.
 - **Read-only:** Outage test calls write nothing (tested). They are tagged `outage_test` in the audit log.
+
+# AEP Operations, regional estimates and the two chat voices
+
+## Operations dashboard (`backend/ops.py`, `GET /ops/overview`; internal)
+- **Same model:** every asset's damage chance at the selected storm size (forecast day through the fitted gust curve, or a simulated category 1–5 with the simulated storm's storm sizes).
+- **Main-line chance per circuit:** 1 − Π(1 − p) over its backbone segments. "High-risk" uses the app's High band (≥ 20%).
+- **Customers likely out:** customers on each circuit × that circuit's main-line chance. Branch-line outages and step restoration are not modeled, so this is an approximation.
+- **Crew-hours:** expected damage per asset × STORMS labor hours for its repair bundle, including the 4.5× indirect-labor factor (the same `LaborModel.mean_hours` the restoration estimate uses).
+- **Crews needed:** crew-hours ÷ (16-hour storm shifts × days) for a 24 h and a 72 h target. With a crew count entered, hours to restore all = crew-hours ÷ crews (no travel between circuits beyond the 4.5× factor).
+- **"Most damage from":** the equipment type carrying the largest share of a circuit's expected damage.
+- **Priority facilities:** the public hospital, fire and ambulance layers, linked to the circuit of the nearest asset that has one. Shown only in the internal portal. Suggested actions are rules on the circuit's risk band.
+- **Privacy:** customers appear only as counts per circuit; no premise numbers, addresses or the private life-support / threat fields. Read-only and audited as `ops_overview`.
+
+## Regional estimates outside AEP's data (`backend/regional.py`)
+- **What it can and can't do:** the live forecast works anywhere, and AEP's data shows how a storm of a given size affects a *typical* home. Nothing is known about the actual equipment, connection or storm history at the location, so answers are regional typical values with Low confidence.
+- **Outage chance:** median and 25–75% range of the premise model's outage chance across a fixed sample of 400 AEP-area homes, precomputed at 11 storm sizes (`artifacts/regional_profile.json`) and log-log interpolated. If the customer says their lines are overhead or underground, the matching subgroup is used.
+- **Repair time:** median P10/P50/P90 across 24 simulated AEP-area homes at the same storm size with 2 crews; other crew counts and arrival delays rescale it with the estimator's own time = delay + crew-hours ÷ crews.
+- **Transfer assumption:** the location's grid, vegetation, terrain and crews behave like the AEP challenge area (Roanoke, VA region). Another utility may serve it.
+- **Confidence:** −0.35 for being outside AEP's data, plus no local storm history and an unknown utility, which always gives Low. Missing items say so.
+- **Location:** a map point, or an address geocoded by OpenStreetMap Nominatim (cached, ≤ 1 request per second, identifying User-Agent). Keys look like `region:<lat>,<lon>[,overhead|underground]` and never contain an AEP premise number. Points within 150 m of a known service location are sent to the normal lookup instead.
+- **What would make it location-specific:** that utility's GIS, topology and damage history (retrain the same pipeline), or nationwide proxies (tree canopy, OpenStreetMap power lines, building density) as features, validated on outage records from several regions.
+
+## Chat voices (`backend/assistant.py`)
+- **One rule set:** grounding, privacy, safety and escalation rules are shared (`BASE_RULES`); only the voice differs.
+- **Customer (My home):** warm customer service, "you / your home", everyday words, one practical next step.
+- **Operations page:** professional briefing for AEP staff, third person ("the premise"), operational terms allowed, no percentile labels (they would trip the number-grounding check).
+- **Offline mode** has matching wording templates for both voices, built from the same tool results, so the numbers are identical.

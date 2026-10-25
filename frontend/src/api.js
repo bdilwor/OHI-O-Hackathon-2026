@@ -35,5 +35,23 @@ export const api = {
     params: { premise, cause: o.cause, reported_hours_ago: o.reported_hours_ago, crews: o.crews,
               ...(o.point ? { lat: o.point[1], lon: o.point[0] } : { device: o.device }) },
   }),
+  forecast: (premise) => request('/forecast', { params: { premise } }),
   audit: (limit = 30) => request('/audit', { params: { limit } }),
+  prepGuidance: (premise, needs, storm) => request('/tools/prep_guidance', {
+    method: 'POST', body: { premise, declared_needs: needs, storm: stormBody(storm) } }),
+  alertEligibility: (premise, needs, storm) => request('/tools/check_alert_eligibility', {
+    method: 'POST', body: { premise, declared_needs: needs, storm: stormBody(storm) } }),
+  draftMessage: (premise, kind) => request('/tools/draft_message', { method: 'POST', body: { premise, kind } }),
+  opsOverview: (sel) => request('/ops/overview', {
+    params: sel.mode === 'sandbox' ? { mode: 'sandbox', intensity: sel.intensity, duration_days: sel.duration_days, crews: sel.crews }
+      : { mode: 'forecast', day: sel.day, crews: sel.crews } }),
+  regionalLocate: ({ address, lat, lon }) => request('/regional/locate', { params: { address, lat, lon } }),
 };
+
+// The storm setting as the tools expect it (forecast day or sandbox sliders).
+function stormBody(storm) {
+  if (!storm) return undefined;
+  return storm.mode === 'sandbox'
+    ? { mode: 'sandbox', intensity: storm.intensity, crews: storm.crews, duration_days: storm.duration_days, radius_m: storm.radius_m }
+    : { mode: 'forecast', day: storm.day ?? 0 };
+}

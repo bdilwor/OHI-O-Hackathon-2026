@@ -4,18 +4,12 @@ import { AmbientLight, DirectionalLight, FlyToInterpolator, LightingEffect } fro
 import { LineLayer, PathLayer, PolygonLayer, ScatterplotLayer, TextLayer } from '@deck.gl/layers';
 import { SimpleMeshLayer } from '@deck.gl/mesh-layers';
 import Map from 'react-map-gl/maplibre';
-import { setWorkerUrl } from 'maplibre-gl';
-import maplibreWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url';
-import 'maplibre-gl/dist/maplibre-gl.css';
 
+import { BASEMAP } from '../basemap.js';
 import { outageColor, pct, riskColor, shade } from '../format.js';
 import { MESHES } from '../meshes.js';
 import { colorTrees, landuseKinds, sampleTrees } from '../trees.js';
 
-// MapLibre 6 loads its tile worker from a separate ES module; let Vite bundle it so the URL is valid in dev and build.
-setWorkerUrl(maplibreWorkerUrl);
-
-const BASEMAP = 'https://basemaps.cartocdn.com/gl/voyager-gl-style/style.json';
 const OVERVIEW = { longitude: -79.96, latitude: 37.27, zoom: 10.3, pitch: 0, bearing: 0 };
 const CAMERA = { '3d': { zoom: 16.9, pitch: 60, bearing: -28 }, '2d': { zoom: 15.6, pitch: 0, bearing: 0 } };
 const PATH_COLORS = { normal: [14, 165, 233], outage: [240, 82, 82], restored: [34, 197, 94] };
@@ -145,12 +139,12 @@ const key = (p) => `${p[0].toFixed(5)},${p[1].toFixed(5)}`;
 const RED = [220, 38, 38];
 
 export default function RiskMap({ data, viewMode = '3d', layersOn, pathState = 'normal', bottleneck, onMapClick,
-                                  wind = 0, footprint = null, outage = null }) {
+                                  wind = 0, footprint = null, outage = null, basemap = BASEMAP, active = true }) {
   const [viewState, setViewState] = useState(OVERVIEW);
   const [treeSpots, setTreeSpots] = useState([]);
   const mapRef = useRef(null);
   const treesFor = useRef(null);
-  const time = useAnimationTime(Boolean(data));
+  const time = useAnimationTime(Boolean(data) && active);  // hidden maps don't animate
   const is3d = viewMode === '3d';
   const homeKey = data?.home?.join(',');
   const lat = data?.home?.[1] ?? 37.2;
@@ -384,7 +378,7 @@ export default function RiskMap({ data, viewMode = '3d', layersOn, pathState = '
       onClick={(info) => onMapClick && info.coordinate && onMapClick(info.coordinate)}
       getCursor={({ isDragging, isHovering }) => (isDragging ? 'grabbing' : isHovering || onMapClick ? 'pointer' : 'grab')}
     >
-      <Map ref={mapRef} mapStyle={BASEMAP} reuseMaps attributionControl onIdle={loadTrees}
+      <Map ref={mapRef} mapStyle={basemap} reuseMaps attributionControl onIdle={loadTrees}
            onLoad={(e) => styleBasemap(e.target)} />
     </DeckGL>
   );

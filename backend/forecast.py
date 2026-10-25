@@ -23,9 +23,11 @@ CACHE_TTL_S = 3600
 TIMEOUT_S = 8
 
 # Peak wind gust (mph) -> expected damage reports across the area, log-interpolated.
-# 40 mph ~ a typical minor event (12 reports); 58 mph (NWS severe) ~ the Sep 2024 storm (194);
-# 70 mph+ ~ the Feb 2025 storm (1,254).
-GUST_ANCHORS = [(20, 0.5), (30, 2.0), (40, 12.0), (50, 60.0), (58, 194.0), (70, 1254.0)]
+# Fitted (ml/weather.py, artifacts/hazard_curve.json): Poisson regression of storm size on the ERA5 peak gust
+# of all 35 storms and 1,175 quiet days, E[n] = exp(-7.754 + 0.2647 * (gust - 15)). Cross-validated it beats
+# the earlier judgment anchors (deviance 13.5k vs 25.3k; storm-day log error 1.19 vs 1.81). Capped at the
+# largest storm on record (1,254 reports, reached at ~71 mph).
+GUST_ANCHORS = [(20, 0.001612), (30, 0.02275), (40, 0.3212), (50, 4.534), (58, 37.69), (65, 240.5), (71.2, 1254.0)]
 STORM_N_CAP = 2000.0
 ICE_CODES = {66, 67}            # freezing rain
 THUNDER_CODES = {95, 96, 99}

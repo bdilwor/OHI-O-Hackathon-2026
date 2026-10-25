@@ -5,13 +5,14 @@ import RiskMap from './RiskMap.jsx';
 import { Legend, MapControls } from './MapPanels.jsx';
 import ChatPanel from './ChatPanel.jsx';
 import AuditDrawer from './AuditDrawer.jsx';
-import SandboxPanel from './SandboxPanel.jsx';
 import OutageCard from './OutageCard.jsx';
-import OutageTestPanel, { OUTAGE_DEFAULTS } from './OutageTestPanel.jsx';
+import { OUTAGE_DEFAULTS } from './OutageTestPanel.jsx';
+import PlanCard from './PlanCard.jsx';
+import { msg } from '../messages.js';
+import { BASEMAPS } from '../basemap.js';
 
 const POLL_MS = 5 * 60 * 1000; // live forecast refresh (backend caches it for an hour)
-let nextId = 1;
-export const msg = (m) => ({ id: `m${nextId++}`, ...m });
+export { msg };
 
 /** Notifications for an outage record changing (appears, estimate moves, restored). */
 function diffOutage(prev, next, test) {
@@ -33,7 +34,7 @@ function diffOutage(prev, next, test) {
   return [];
 }
 
-function stormLabel(storm) {
+export function stormLabel(storm) {
   if (!storm) return null;
   if (storm.sandbox) return `simulated category ${storm.intensity} storm (${storm.label.toLowerCase()})`;
   return storm.when ? `${storm.label.toLowerCase()} weather ${storm.when}` : storm.label;
@@ -47,19 +48,19 @@ function windLevel(mapData, sandbox) {
 }
 
 /**
- * One map + chat area. `space` holds this area's persistent state (storm setting, map snapshot, chat), lifted
- * to App so switching between My home and Sandbox keeps both.
+ * Data and actions for one map + chat area. `space` holds its persistent state (storm setting, map snapshot, chat),
+ * lifted to App so switching views keeps it. `kind` is 'home' (customer) or 'ops' (storm scenario + outage test).
  */
-export default function Workspace({ kind, home, space, setSpace, notify, onMapClick, onError }) {
-  const sandbox = kind === 'sandbox';
-  const outageTab = kind === 'outage';
-  const [viewMode, setViewMode] = useState('3d');
-  const [layersOn, setLayersOn] = useState({ homes: true, grid: true, trees: true, path: true });
+export function useWorkspace({ kind, home, space, setSpace, notify, onError }) {
+  const outageTab = kind === 'ops';
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState(false);
-  const { storm, mapData, messages, needs, demoSafe, bottleneck, session, outage, devices } = space;
+  const { storm, mapData, needs, demoSafe, session, outage } = space;
+  const sandbox = storm?.mode === 'sandbox';
   const params = space.outageParams || OUTAGE_DEFAULTS;
-  const premise = home?.premise;
+  const regional = Boolean(home?.regional);
+  const needsAep = regional && kind !== 'home';  // Storm/Outage tests need equipment that only exists in AEP's data
+  const premise = needsAep ? undefined : home?.premise;
   const lastSnap = useRef(mapData);
   const set = (patch) => setSpace((s) => ({ ...s, ...(typeof patch === 'function' ? patch(s) : patch) }));
 
@@ -84,7 +85,7 @@ export default function Workspace({ kind, home, space, setSpace, notify, onMapCl
   };
   useEffect(() => { refresh.current(); }, [premise, JSON.stringify(storm)]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Outages: the feed on My home, the simulated fault on Outage test. Only the latest response is applied.
+  // Outages: the feed on My home, the simulated fault on Operations. Only the latest response is applied.
   const lastOutage = useRef(outage);
   const outageTicket = useRef(0);
   const applyOutage = (next) => {
@@ -100,7 +101,7 @@ export default function Workspace({ kind, home, space, setSpace, notify, onMapCl
   };
   const loadOutage = useRef(null);
   loadOutage.current = async () => {
-    if (!premise || sandbox) return;
+    if (!premise || regional) return;
     const ticket = ++outageTicket.current;
     try {
       let next = null;
@@ -113,7 +114,7 @@ export default function Workspace({ kind, home, space, setSpace, notify, onMapCl
   };
   useEffect(() => { loadOutage.current(); }, [premise, JSON.stringify(params)]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
-    if (!outageTab || !premise || devices) return;
+    if (!outageTab || !premise || space.devices) return;
     api.outageDevices(premise).then((d) => set({ devices: d.devices })).catch((e) => onError(e.message));
   }, [outageTab, premise]); // eslint-disable-line react-hooks/exhaustive-deps
   const setParams = (p) => set({ outageParams: p });
@@ -127,7 +128,7 @@ export default function Workspace({ kind, home, space, setSpace, notify, onMapCl
 
   // My home: poll the live forecast, and listen for real outage events for this home.
   useEffect(() => {
-    if (sandbox || !premise) return undefined;
+    if (kind !== 'home' || !premise) return undefined;
     const id = setInterval(() => { refresh.current(true); loadOutage.current(); }, POLL_MS);
     const es = new EventSource(api.stormEventsUrl);
     es.onmessage = (e) => {
@@ -140,7 +141,7 @@ export default function Workspace({ kind, home, space, setSpace, notify, onMapCl
       set((s) => ({ messages: [...s.messages, msg({ role: 'assistant', text: data.text, proactive: true })] }));
     };
     return () => { clearInterval(id); es.close(); };
-  }, [sandbox, premise]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [kind, premise]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function send(text) {
     set((s) => ({ messages: [...s.messages, msg({ role: 'user', text })] }));
@@ -151,7 +152,8 @@ export default function Workspace({ kind, home, space, setSpace, notify, onMapCl
             ...(params.point ? { lat: params.point[1], lon: params.point[0] } : { device: params.device }) }
         : undefined;
       const r = await api.chat({ message: text, session_id: session, premise, declared_needs: needs,
-                                 demo_safe: demoSafe, storm, outage: activeOutage });
+                                 demo_safe: demoSafe, storm, outage: activeOutage,
+                                 audience: kind === 'home' ? 'customer' : 'operations' });
       set((s) => ({
         messages: [...s.messages, msg({ role: 'assistant', text: r.reply, qtype: r.question_type,
           changers: r.what_could_change, confidence: r.confidence, storm: r.storm, mode: r.mode, provider: r.provider,
@@ -167,36 +169,46 @@ export default function Workspace({ kind, home, space, setSpace, notify, onMapCl
   }
 
   const pathState = outage?.status === 'restored' ? 'restored' : outage?.affects_you ? 'outage' : 'normal';
-  const mapClick = !home ? onMapClick
-    : outageTab ? ([lon, lat]) => setParams({ ...params, point: [lon, lat] }) : null;
+  const toggleNeed = (id) => set((s) => ({ needs: s.needs.includes(id) ? s.needs.filter((x) => x !== id) : [...s.needs, id] }));
+  return { set, premise, regional, needsAep, sandbox, outageTab, params, setParams, restore, loading, busy, send,
+           pathState, toggleNeed, wind: windLevel(mapData, sandbox) };
+}
+
+/** Customer map + chat area (My home). */
+export default function Workspace({ home, space, setSpace, notify, onMapClick, onError, mapTheme, onMapTheme, active }) {
+  const [viewMode, setViewMode] = useState('3d');
+  const [layersOn, setLayersOn] = useState({ homes: true, grid: true, trees: true, path: true });
+  const w = useWorkspace({ kind: 'home', home, space, setSpace, notify, onError });
+  const { storm, mapData, messages, needs, demoSafe, bottleneck, outage } = space;
 
   return (
     <main className="main">
       <div className="map-wrap">
         <RiskMap data={mapData} viewMode={viewMode} layersOn={layersOn} bottleneck={outage?.bottleneck || bottleneck}
-                 onMapClick={mapClick} wind={windLevel(mapData, sandbox)} pathState={pathState}
-                 footprint={sandbox && mapData ? storm.radius_m : null} outage={outage} />
+                 onMapClick={home ? null : onMapClick} wind={w.wind} pathState={w.pathState} outage={outage}
+                 basemap={BASEMAPS[mapTheme]} active={active} />
         {home && (
           <>
-            <MapControls viewMode={viewMode} onViewMode={setViewMode} storm={storm} showForecast={kind === 'home'}
-                         onStorm={(st) => set({ storm: st })} forecast={mapData?.forecast} layersOn={layersOn}
-                         loading={loading} onToggle={(id) => setLayersOn((l) => ({ ...l, [id]: !l[id] }))} />
-            {sandbox && (
-              <SandboxPanel value={storm} onChange={(st) => set({ storm: st })} restoration={mapData?.restoration} />
+            <MapControls viewMode={viewMode} onViewMode={setViewMode} theme={mapTheme} onTheme={onMapTheme}
+                         storm={storm} onStorm={(st) => w.set({ storm: st })} forecast={mapData?.forecast}
+                         layersOn={layersOn} loading={w.loading}
+                         onToggle={(id) => setLayersOn((l) => ({ ...l, [id]: !l[id] }))} />
+            {!outage && !w.regional && <div className="no-outage">✓ No outages reported at your home</div>}
+            {w.regional && (
+              <div className="no-outage regional-chip" title="This location is outside AEP's challenge data">
+                Regional estimate · outside AEP's data
+              </div>
             )}
-            {outageTab && (
-              <OutageTestPanel value={params} onChange={setParams} devices={devices || []} onRestore={restore} />
-            )}
-            {kind === 'home' && !outage && <div className="no-outage">✓ No outages reported at your home</div>}
-            {!sandbox && <OutageCard outage={outage} test={outageTab} />}
+            <PlanCard premise={w.premise} needs={needs} storm={storm} regional={w.regional} onError={onError}
+                      refreshKey={mapData?.storm?.storm_n} />
+            <OutageCard outage={outage} />
             <Legend stormLabel={stormLabel(mapData?.storm)} />
           </>
         )}
       </div>
       <aside className="side" aria-label="Chat with the outage concierge">
-        <ChatPanel messages={messages} busy={busy} onSend={send} disabled={!home} area={kind}
-                   needs={needs} onToggleNeed={(id) => set((s) => ({ needs: s.needs.includes(id) ? s.needs.filter((x) => x !== id) : [...s.needs, id] }))}
-                   demoSafe={demoSafe} onDemoSafe={(v) => set({ demoSafe: v })} />
+        <ChatPanel messages={messages} busy={w.busy} onSend={w.send} disabled={!home} area="home"
+                   needs={needs} onToggleNeed={w.toggleNeed} demoSafe={demoSafe} onDemoSafe={(v) => w.set({ demoSafe: v })} />
         <AuditDrawer refreshKey={messages.length} />
       </aside>
     </main>

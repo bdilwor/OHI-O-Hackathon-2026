@@ -4,6 +4,9 @@ import { renderReply } from '../format.js';
 
 const SUGGESTIONS = ['Will I lose power?', 'How long until my power is back?', 'What should I do to prepare?',
   'What if crews are delayed until tomorrow?', 'Do I qualify for outage alerts?'];
+const OPS_SUGGESTIONS = ['What is the outage risk for this premise?', 'How long would restoration take?',
+  'What should the customer do to prepare?', 'What if crews are delayed until tomorrow?',
+  'Does the customer qualify for alerts?'];
 const CHANGE_TITLE = { risk: 'What could change these odds', restoration: 'What could change this repair time' };
 
 export const NEEDS = [
@@ -40,12 +43,17 @@ function Message({ m }) {
   );
 }
 
-const AREA = { sandbox: ['storm test', 'Answers use the real outage model with your simulated storm settings.'],
-  outage: ['outage test', 'Answers use the real model and grid map with your simulated outage.'] };
+const AREA = {
+  home: ['customer', 'Answers come from AEP data, the outage model and the live forecast for the day shown on the map.'],
+  sandbox: ['AEP Operations · storm test', 'Staff briefings from the real outage model under the simulated storm settings.'],
+  outage: ['AEP Operations · outage test', 'Staff briefings from the real model and grid map for the simulated outage.'],
+  ops: ['AEP Operations', 'Staff briefings from the real outage model and grid map under the scenario and outage set here.'],
+};
 
 export default function ChatPanel({ messages, busy, onSend, needs, onToggleNeed, demoSafe, onDemoSafe, disabled,
                                     area = 'home' }) {
-  const [tag, blurb] = AREA[area] || [null, 'Answers come from AEP data, the outage model and the live forecast for the day shown on the map.'];
+  const [tag, blurb] = AREA[area] || AREA.home;
+  const ops = area !== 'home';
   const [text, setText] = useState('');
   const endRef = useRef(null);
   useEffect(() => { endRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' }); }, [messages, busy]);
@@ -55,9 +63,9 @@ export default function ChatPanel({ messages, busy, onSend, needs, onToggleNeed,
   return (
     <>
       <div className="chat-head">
-        <h2>Outage Concierge {tag && <span className="tag sandbox">{tag}</span>}</h2>
+        <h2>Outage Concierge <span className={`tag ${ops ? 'sandbox' : 'customer'}`}>{tag}</span></h2>
         <p>{blurb}</p>
-        <div className="needs" role="group" aria-label="Tell us about needs at home (optional)">
+        <div className="needs" role="group" aria-label={ops ? 'Customer-declared needs (optional)' : 'Tell us about needs at home (optional)'}>
           {NEEDS.map((n) => (
             <button key={n.id} type="button" className="need" aria-pressed={needs.includes(n.id)}
                     onClick={() => onToggleNeed(n.id)}>{n.label}</button>
@@ -73,14 +81,14 @@ export default function ChatPanel({ messages, busy, onSend, needs, onToggleNeed,
         <div ref={endRef} />
       </div>
       <div className="chips">
-        {SUGGESTIONS.map((s) => (
+        {(ops ? OPS_SUGGESTIONS : SUGGESTIONS).map((s) => (
           <button key={s} type="button" className="chip" disabled={disabled || busy} onClick={() => send(s)}>{s}</button>
         ))}
       </div>
       <form className="composer" onSubmit={(e) => { e.preventDefault(); send(text); }}>
         <label htmlFor="chat-input" className="sr-only">Ask a question</label>
         <input id="chat-input" className="input" value={text} onChange={(e) => setText(e.target.value)}
-               placeholder={disabled ? 'Find your home first' : 'Ask about your power…'} disabled={disabled} />
+               placeholder={disabled ? 'Find your home first' : ops ? 'Ask about this location…' : 'Ask about your power…'} disabled={disabled} />
         <button className="btn primary" type="submit" disabled={disabled || busy || !text.trim()}>Send</button>
       </form>
       <div className="composer-foot">
