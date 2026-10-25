@@ -119,6 +119,7 @@ class Session:
     premise: str | None = None
     needs: list = field(default_factory=list)
     storm: dict | None = None  # the customer's map setting: forecast day or replay
+    outage: dict | None = None  # Outage test tab: the simulated fault (confirmed outage for this session)
     last_estimate: dict | None = None
     last_results: dict = field(default_factory=dict)
     history: list = field(default_factory=list)
@@ -250,7 +251,8 @@ class Assistant:
     # ---- public ----
 
     def chat(self, message: str, session_id: str = "default", premise: str | None = None,
-             declared_needs: list[str] | None = None, demo_safe: bool = False, storm: dict | None = None) -> dict:
+             declared_needs: list[str] | None = None, demo_safe: bool = False, storm: dict | None = None,
+             outage: dict | None = None) -> dict:
         s = self.sessions.setdefault(session_id, Session())
         if premise:
             s.premise = str(premise)
@@ -258,6 +260,7 @@ class Assistant:
             s.needs = [n for n in declared_needs if n in DECLARED_NEEDS]
         if storm is not None:
             s.storm = storm
+        s.outage = outage
         newly_declared = [n for n in detect_needs(message) if n not in s.needs]
         s.needs += newly_declared
 
@@ -326,7 +329,9 @@ class Assistant:
             call_args = {"premise": s.premise, "declared_needs": s.needs, "storm": storm}
         else:
             call_args = {"premise": s.premise, "storm": storm, **args}
-        source = "sandbox" if (storm or {}).get("mode") == "sandbox" else "chat"
+        source = "sandbox" if (storm or {}).get("mode") == "sandbox" else "outage_test" if s.outage else "chat"
+        if name == "estimate_restoration" and s.outage:  # confirmed outage: its known damage drives the estimate
+            name, call_args = "outage_restoration", {"premise": s.premise, "outage": s.outage}
         result = self.tools.call(name, call_args, source=source, provider=provider)
         if name == "estimate_restoration" and result.get("p50_hrs") is not None:
             prev = s.last_estimate
@@ -343,8 +348,21 @@ class Assistant:
 
     # ---- LLM turn ----
 
+    def _outage_record(self, s: Session) -> dict | None:
+        if not (s.outage and s.premise and self.tools.outages):
+            return None
+        try:
+            return self.tools.outages.test(s.premise, **s.outage)
+        except (LookupError, ValueError):
+            return None
+
     def _context_notes(self, s: Session) -> list[dict]:
         facts = " ".join(self._confirmed_lines(self.storm.confirmed_for(s.premise)))
+        rec = self._outage_record(s)
+        if rec and rec["affects_you"]:
+            facts = (f"An outage affecting the customer's home is confirmed (cause: {rec['cause']}; location: "
+                     f"{rec['location']}; reported {rec['reported_display']}). Their power is out now. "
+                     f"Call estimate_restoration for the expected fix time.")
         needs = "; ".join("they " + DECLARED_NEEDS[n] for n in s.needs) or "none"
         return [
             {"role": "system", "content": f"Confirmed by AEP right now (nothing else is confirmed): {facts}"},
@@ -443,6 +461,12 @@ class Assistant:
         if not s.premise:
             return self._finish(s, message, "Please find your home first so I can check your outage risk. If you see "
                                 "a downed line, stay 35 feet away and call 911.", intents, [], [], fallback=True)
+        rec = self._outage_record(s)
+        if rec and rec["affects_you"] and "risk" in intents and not {"restoration", "what_if"} & set(intents):
+            e = self._run_tool(s, "estimate_restoration", {}, None)
+            return self._finish(s, message, f"Yes: your power is out right now ({rec['cause'].lower()}, reported "
+                                f"{rec['reported_display']}). It should most likely be back by {e['most_likely_fixed_by']}.",
+                                ["restoration"], ["outage_restoration"], [e], fallback=False)
         if self.storm.restored_for(s.premise) and not set(intents) - {"restoration", "risk", "what_if"}:
             return self._finish(s, message, "Yes: power has been restored to your home. If yours is still out, "
                                 "report it to AEP; it may be a separate problem at your home.",
@@ -477,10 +501,15 @@ class Assistant:
             results.append(e)
             if e.get("fallback"):
                 return self._unknown_location(s, message, intents, tools_used, results)
-            lead = ("Your outage is confirmed; power" if self.storm.outage_for(s.premise)
-                    else "If your power goes out, it")
-            text = (f"{lead} would most likely be back in about {e['p50_hrs']:g} hours "
-                    f"(likely {e['p10_hrs']:g}-{e['p90_hrs']:g} hours).")
+            if e.get("outage_confirmed"):
+                text = (f"Your outage ({e['cause'].lower()}) was reported {e['reported']}. Power should most likely "
+                        f"be back by {e['most_likely_fixed_by']} (likely between {e['fixed_between'][0]} and "
+                        f"{e['fixed_between'][1]}), about {e['p50_hrs']:g} hours after it was reported.")
+            else:
+                lead = ("Your outage is confirmed; power" if self.storm.outage_for(s.premise)
+                        else "If your power goes out, it")
+                text = (f"{lead} would most likely be back in about {e['p50_hrs']:g} hours "
+                        f"(likely {e['p10_hrs']:g}-{e['p90_hrs']:g} hours).")
             ch = e.get("change_vs_previous")
             if ch and ch["p50_change_hrs"]:
                 text += (f" That's {abs(ch['p50_change_hrs']):g} hours "
@@ -525,7 +554,8 @@ class Assistant:
         by_tool = {}
         for name, r in zip(tools_used, results):
             by_tool.setdefault(name, r)
-        est, risk = by_tool.get("estimate_restoration"), by_tool.get("get_outage_risk")
+        est = by_tool.get("estimate_restoration") or by_tool.get("outage_restoration")
+        risk = by_tool.get("get_outage_risk")
         if any(isinstance(r, dict) and r.get("fallback") for r in results):
             return {"question_type": "other", "what_could_change": [], "confidence": UNKNOWN_CONFIDENCE,
                     "storm": (risk or est or {}).get("storm"), "declared_needs": list(s.needs)}

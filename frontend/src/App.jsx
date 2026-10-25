@@ -7,30 +7,41 @@ import { Bell, Toasts, useNotifications } from './components/Notifications.jsx';
 
 const STATUS_DOT = { Calm: 'ok', Breezy: 'ok', Windy: 'live', Storm: 'out', 'Severe storm': 'out' };
 const rid = () => Math.random().toString(36).slice(2, 10);
-const route = () => (window.location.hash.startsWith('#/sandbox') ? 'sandbox' : 'home');
+const AREAS = [['home', '#/', 'My home'], ['sandbox', '#/storm-test', 'Storm test'], ['outage', '#/outage-test', 'Outage test']];
+const route = () => {
+  const h = window.location.hash;
+  if (h.startsWith('#/storm-test') || h.startsWith('#/sandbox')) return 'sandbox';
+  if (h.startsWith('#/outage-test')) return 'outage';
+  return 'home';
+};
 
 function newSpace(kind) {
   return {
     storm: kind === 'sandbox' ? SANDBOX_DEFAULTS : { mode: 'forecast', day: 0 },
     mapData: null, messages: [], needs: [], demoSafe: false, bottleneck: null,
-    session: `${kind === 'sandbox' ? 'sandbox' : 'web'}-${rid()}`,
+    session: `${{ sandbox: 'sandbox', outage: 'outage' }[kind] || 'web'}-${rid()}`,
+    outage: null, outageParams: undefined, devices: null,
   };
 }
 
 function welcome(home, kind) {
   const base = `Found your home (${home.masked_address}, ${home.service_type} service). `;
-  return msg({ role: 'assistant', text: kind === 'sandbox'
-    ? `${base}This is the sandbox: move the storm sliders and watch the map, notifications and my answers react. ` +
-      'Everything here is simulated; nothing is saved.'
-    : `${base}The map shows what the outage model predicts around you for the selected forecast day: green is good, ` +
-      'red is bad. Ask me anything, or tap a suggestion below.' });
+  const text = {
+    sandbox: `${base}This is the storm test: move the storm sliders and watch the map, notifications and my answers ` +
+      'react. Everything here is simulated; nothing is saved.',
+    outage: `${base}This is the outage test: pick where a fault happens (or click equipment on the map), choose a ` +
+      'cause, and press Start outage to see what a customer would see. Nothing is saved.',
+  }[kind] || `${base}The map shows what the outage model predicts around you for the selected forecast day: ` +
+      'green is good, red is bad. Ask me anything, or tap a suggestion below.';
+  return msg({ role: 'assistant', text });
 }
 
 export default function App() {
   const [view, setView] = useState(route());
   const [home, setHome] = useState(null);
   const [pointResult, setPointResult] = useState(null);
-  const [spaces, setSpaces] = useState({ home: newSpace('home'), sandbox: newSpace('sandbox') });
+  const fresh = () => ({ home: newSpace('home'), sandbox: newSpace('sandbox'), outage: newSpace('outage') });
+  const [spaces, setSpaces] = useState(fresh);
   const [error, setError] = useState('');
   const n = useNotifications();
 
@@ -44,10 +55,7 @@ export default function App() {
   function confirmHome(candidate) {
     setHome(candidate);
     setPointResult(null);
-    setSpaces({
-      home: { ...newSpace('home'), messages: [welcome(candidate, 'home')] },
-      sandbox: { ...newSpace('sandbox'), messages: [welcome(candidate, 'sandbox')] },
-    });
+    setSpaces(Object.fromEntries(AREAS.map(([k]) => [k, { ...newSpace(k), messages: [welcome(candidate, k)] }])));
   }
 
   async function lookupPoint([lon, lat]) {
@@ -60,17 +68,16 @@ export default function App() {
   const you = space.mapData?.your_risk;
 
   return (
-    <div className={`app ${view === 'sandbox' ? 'is-sandbox' : ''}`}>
+    <div className={`app ${view !== 'home' ? 'is-test' : ''}`}>
       <header className="topbar">
         <div className="brand">
           <div className="brand-mark" aria-hidden="true">⚡</div>
           <div>Outage Concierge<small>AEP · HackOHI/O 2026</small></div>
         </div>
         <nav className="tabs" aria-label="Areas">
-          <a href="#/" aria-current={view === 'home' ? 'page' : undefined}>My home</a>
-          <a href="#/sandbox" aria-current={view === 'sandbox' ? 'page' : undefined}>
-            Sandbox <span className="tag sandbox">demo</span>
-          </a>
+          {AREAS.map(([k, href, label]) => (
+            <a key={k} href={href} aria-current={view === k ? 'page' : undefined}>{label}</a>
+          ))}
         </nav>
         <div className="spacer" />
         {shown && (
@@ -87,7 +94,7 @@ export default function App() {
         {home && (
           <span className="home-chip">
             {home.masked_address}
-            <button type="button" onClick={() => { setHome(null); setSpaces({ home: newSpace('home'), sandbox: newSpace('sandbox') }); }}>
+            <button type="button" onClick={() => { setHome(null); setSpaces(fresh()); }}>
               Change
             </button>
           </span>
@@ -95,13 +102,7 @@ export default function App() {
         <Bell history={n.history} unread={n.unread} onOpen={n.clearUnread} desktop={n.desktop}
               onEnableDesktop={n.enableDesktop} />
       </header>
-      {view === 'sandbox' && (
-        <div className="sandbox-banner" role="note">
-          <b>Sandbox</b> · simulated storms for testing and demos. Uses the real outage model, but nothing is saved or
-          sent to AEP systems.
-        </div>
-      )}
-      <Toasts toasts={n.toasts} onDismiss={n.dismiss} />
+      <Toasts toasts={n.toasts} onDismiss={n.dismiss} onPause={n.pause} onResume={n.resume} />
       <div className="workspace-wrap">
         <Workspace key={view} kind={view} home={home} space={space} setSpace={setSpace} notify={n.notify}
                    onMapClick={lookupPoint} onError={setError} />

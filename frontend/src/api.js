@@ -29,5 +29,11 @@ export const api = {
   }),
   stormEventsUrl: '/api/storm/events',
   chat: (body) => request('/chat', { method: 'POST', body }),
+  outageCurrent: (premise) => request('/outages/current', { params: { premise } }),
+  outageDevices: (premise) => request('/outage-test/devices', { params: { premise } }),
+  outageTest: (premise, o) => request('/outage-test', {
+    params: { premise, cause: o.cause, reported_hours_ago: o.reported_hours_ago, crews: o.crews,
+              ...(o.point ? { lat: o.point[1], lon: o.point[0] } : { device: o.device }) },
+  }),
   audit: (limit = 30) => request('/audit', { params: { limit } }),
 };

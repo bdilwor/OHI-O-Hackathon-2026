@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import ConfidenceMeter from './ConfidenceMeter.jsx';
 import { renderReply } from '../format.js';
 
-const SUGGESTIONS = ['Will I lose power?', 'How long would repairs take?', 'What should I do to prepare?',
+const SUGGESTIONS = ['Will I lose power?', 'How long until my power is back?', 'What should I do to prepare?',
   'What if crews are delayed until tomorrow?', 'Do I qualify for outage alerts?'];
 const CHANGE_TITLE = { risk: 'What could change these odds', restoration: 'What could change this repair time' };
 
@@ -40,8 +40,12 @@ function Message({ m }) {
   );
 }
 
+const AREA = { sandbox: ['storm test', 'Answers use the real outage model with your simulated storm settings.'],
+  outage: ['outage test', 'Answers use the real model and grid map with your simulated outage.'] };
+
 export default function ChatPanel({ messages, busy, onSend, needs, onToggleNeed, demoSafe, onDemoSafe, disabled,
-                                    sandbox = false }) {
+                                    area = 'home' }) {
+  const [tag, blurb] = AREA[area] || [null, 'Answers come from AEP data, the outage model and the live forecast for the day shown on the map.'];
   const [text, setText] = useState('');
   const endRef = useRef(null);
   useEffect(() => { endRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' }); }, [messages, busy]);
@@ -51,10 +55,8 @@ export default function ChatPanel({ messages, busy, onSend, needs, onToggleNeed,
   return (
     <>
       <div className="chat-head">
-        <h2>Outage Concierge {sandbox && <span className="tag sandbox">sandbox</span>}</h2>
-        <p>{sandbox
-          ? 'Answers use the real outage model with your simulated storm settings.'
-          : 'Answers come from AEP data, the outage model and the live forecast for the day shown on the map.'}</p>
+        <h2>Outage Concierge {tag && <span className="tag sandbox">{tag}</span>}</h2>
+        <p>{blurb}</p>
         <div className="needs" role="group" aria-label="Tell us about needs at home (optional)">
           {NEEDS.map((n) => (
             <button key={n.id} type="button" className="need" aria-pressed={needs.includes(n.id)}

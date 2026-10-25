@@ -16,6 +16,7 @@ from pydantic import BaseModel, Field
 
 from lookup import Lookup
 from mapdata import MapData
+from outages import CAUSES, OutageService
 from ml.db import get_engine
 from ml.score import PremiseScorer
 from forecast import ForecastService
@@ -40,6 +41,8 @@ def build_state() -> dict:
     state = {"engine": engine, "scorer": scorer, "estimator": estimator, "storm": storm, "audit": audit,
              "tools": toolbox, "lookup": Lookup(engine, scorer), "assistant": Assistant(toolbox, storm),
              "map": MapData(engine, scorer)}
+    state["outages"] = OutageService(engine, scorer, estimator, state["map"], storm)
+    toolbox.outages = state["outages"]
     print(f"Startup complete in {time.time() - t0:.1f}s")
     return state
 
@@ -98,6 +101,16 @@ class MessageRequest(BaseModel):
     storm: StormContext | None = None
 
 
+class OutageTest(BaseModel):
+    """A simulated fault for the Outage test tab: a supply-path device index or a clicked map point."""
+    cause: str = Field("tree", pattern="^(" + "|".join(CAUSES) + ")$")
+    device: int | None = Field(None, ge=0, le=20)
+    lat: float | None = Field(None, ge=-90, le=90)
+    lon: float | None = Field(None, ge=-180, le=180)
+    reported_hours_ago: float = Field(0, ge=0, le=72)
+    crews: int = Field(2, ge=1, le=30)
+
+
 class ChatRequest(BaseModel):
     message: str = Field(..., min_length=1, max_length=1000)
     session_id: str = "default"
@@ -105,6 +118,7 @@ class ChatRequest(BaseModel):
     declared_needs: list[str] | None = None
     demo_safe: bool = False
     storm: StormContext | None = None
+    outage: OutageTest | None = None
 
 
 def run_tool(name: str, args: dict) -> dict:
@@ -169,6 +183,44 @@ def map_context(premise: str, mode: str = Query("forecast", pattern="^(forecast|
                           {k: v for k, v in payload.items() if k != "home"}, [],
                           source="sandbox" if mode == "sandbox" else "api")
     return payload
+
+
+# ---- outages ----
+
+def _outage_call(fn, audit_tool: str, audit_input: dict, source: str):
+    try:
+        out = fn()
+    except LookupError as e:
+        raise HTTPException(404, str(e)) from e
+    except ValueError as e:
+        raise HTTPException(422, str(e)) from e
+    STATE["audit"].record(audit_tool, audit_input, out if isinstance(out, dict) else {}, [], source=source)
+    return out
+
+
+@app.get("/outages/current")
+def outage_current(premise: str):
+    """Current outage affecting the customer's home from the outage feed (None when there isn't one)."""
+    return {"outage": _outage_call(lambda: STATE["outages"].current(premise), "outage_current",
+                                   {"premise": premise}, "api")}
+
+
+@app.get("/outage-test/devices")
+def outage_test_devices(premise: str):
+    return {"devices": _outage_call(lambda: STATE["outages"].path_devices(premise), "outage_test_devices",
+                                    {"premise": premise}, "outage_test")}
+
+
+@app.get("/outage-test")
+def outage_test(premise: str, cause: str = Query("tree", pattern="^(" + "|".join(CAUSES) + ")$"),
+                device: int | None = Query(None, ge=0, le=20), lat: float | None = Query(None, ge=-90, le=90),
+                lon: float | None = Query(None, ge=-180, le=180),
+                reported_hours_ago: float = Query(0, ge=0, le=72), crews: int = Query(2, ge=1, le=30)):
+    """Simulated outage (Outage test tab). Stateless and read-only: recomputed on every call, never stored."""
+    args = {"cause": cause, "device": device, "lat": lat, "lon": lon, "reported_hours_ago": reported_hours_ago,
+            "crews": crews}
+    return _outage_call(lambda: STATE["outages"].test(premise, **args), "outage_test", {"premise": premise, **args},
+                        "outage_test")
 
 
 # ---- tools ----
@@ -278,7 +330,8 @@ def chat(req: ChatRequest):
     try:
         return STATE["assistant"].chat(req.message, session_id=req.session_id, premise=req.premise,
                                        declared_needs=req.declared_needs, demo_safe=req.demo_safe,
-                                       storm=req.storm.model_dump() if req.storm else None)
+                                       storm=req.storm.model_dump() if req.storm else None,
+                                       outage=req.outage.model_dump() if req.outage else None)
     except ValueError as e:
         raise HTTPException(422, str(e)) from e
 

@@ -5,7 +5,7 @@ const NAMES = { 1: 'Breezy', 2: 'Windy', 3: 'Strong storm', 4: 'Severe storm', 5
 const YD_PER_M = 1.09361;
 
 /** Demo/testing controls. Everything here is simulated client-side + read-only model calls; nothing is saved. */
-export default function SandboxPanel({ value, onChange, onSimulateOutage, restoration }) {
+export default function SandboxPanel({ value, onChange, restoration }) {
   const [draft, setDraft] = useState(value);
   const [unit, setUnit] = useState('m');
   const [playing, setPlaying] = useState(false);
@@ -40,7 +40,7 @@ export default function SandboxPanel({ value, onChange, onSimulateOutage, restor
   const radiusShown = unit === 'm' ? draft.radius_m : Math.round(draft.radius_m * YD_PER_M);
   return (
     <section className="panel sandbox-panel" aria-label="Sandbox storm controls">
-      <h3><span className="tag sandbox">sandbox</span> Simulated storm</h3>
+      <h3><span className="tag sandbox">storm test</span> Simulated storm</h3>
       <div className="field">
         <span>Storm intensity: <span className="val">{draft.intensity} · {NAMES[draft.intensity]}</span></span>
         <input type="range" min="1" max="5" value={draft.intensity} onChange={(e) => update({ intensity: +e.target.value })}
@@ -78,7 +78,6 @@ export default function SandboxPanel({ value, onChange, onSimulateOutage, restor
         <button type="button" className="btn small primary" onClick={playStorm} disabled={playing}>
           {playing ? 'Playing…' : '▶ Play storm'}
         </button>
-        <button type="button" className="btn small" onClick={onSimulateOutage}>Simulate outage at my home</button>
         <button type="button" className="btn small ghost" onClick={() => { clearInterval(play.current); setPlaying(false); onChange(SANDBOX_DEFAULTS); }}>
           Reset
         </button>

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import DeckGL from '@deck.gl/react';
 import { AmbientLight, DirectionalLight, FlyToInterpolator, LightingEffect } from '@deck.gl/core';
-import { LineLayer, PathLayer, ScatterplotLayer, TextLayer } from '@deck.gl/layers';
+import { LineLayer, PathLayer, PolygonLayer, ScatterplotLayer, TextLayer } from '@deck.gl/layers';
 import { SimpleMeshLayer } from '@deck.gl/mesh-layers';
 import Map from 'react-map-gl/maplibre';
 import { setWorkerUrl } from 'maplibre-gl';
@@ -131,6 +131,8 @@ const TOOLTIPS = {
     : `<b>${o.label}</b><br/>Chance it's damaged: <b>${pct(o.p, 1)}</b><br/>
        <span style="color:#64748b">On your supply path. Crews restore main-line devices first.</span>`),
   footprint: (o) => `<b>Simulated storm area</b><br/>${Math.round(o.radius)} m around your home`,
+  'outage-area': (o) => `<b>Outage area</b><br/>~${o.homes} homes without power`,
+  'outage-fault': (o) => `<b>Fault</b>: ${o.cause}<br/>${o.location}`,
 };
 
 function tooltip({ object, layer }) {
@@ -139,8 +141,11 @@ function tooltip({ object, layer }) {
   return fn ? { html: fn(object), className: 'deck-tooltip' } : null;
 }
 
+const key = (p) => `${p[0].toFixed(5)},${p[1].toFixed(5)}`;
+const RED = [220, 38, 38];
+
 export default function RiskMap({ data, viewMode = '3d', layersOn, pathState = 'normal', bottleneck, onMapClick,
-                                  wind = 0, footprint = null }) {
+                                  wind = 0, footprint = null, outage = null }) {
   const [viewState, setViewState] = useState(OVERVIEW);
   const [treeSpots, setTreeSpots] = useState([]);
   const mapRef = useRef(null);
@@ -176,10 +181,16 @@ export default function RiskMap({ data, viewMode = '3d', layersOn, pathState = '
   const leafy = useMemo(() => trees.filter((t) => t.kind !== 'pine'), [trees]);
 
   // ---- static geometry derived from the payload ----
+  const live = outage && outage.status !== 'restored' ? outage : null;
+  const affected = useMemo(() => new Set((live?.affected?.positions || []).map(key)), [live]);
   const homes = useMemo(() => (data?.homes || []).map((h, i) => ({
-    ...h, yaw: Math.round(hash(i, 1) * 4) * 90 + (hash(i, 2) - 0.5) * 20,
+    ...h, out: affected.has(key(h.position)) || (h.is_you && live?.affects_you), yaw: Math.round(hash(i, 1) * 4) * 90 + (hash(i, 2) - 0.5) * 20,
     scale: h.is_you ? YOUR_HOUSE : [HOUSE[0] * (0.85 + hash(i, 3) * 0.35), HOUSE[1] * (0.9 + hash(i, 4) * 0.25), HOUSE[2]],
-  })), [data?.homes]);
+  })), [data?.homes, affected, live]);
+  const outageArea = useMemo(() => (live?.affected?.polygon?.length
+    ? [{ polygon: live.affected.polygon, homes: live.affected.homes }] : []), [live]);
+  const fault = useMemo(() => (live ? [{ position: live.fault_position, cause: live.cause, location: live.location }] : []),
+    [live]);
   const lines3d = useMemo(() => (data?.lines || []).map((l) => ({ ...l, path: sagPath(l.path, lat) })), [data, lat]);
   const lines2d = useMemo(() => (data?.lines || []).map((l) => ({ ...l, path: l.path.map(([x, y]) => [x, y]) })), [data]);
   const hotLines = useMemo(() => lines3d.filter((l) => l.p >= 0.03 && l.overhead), [lines3d]);
@@ -191,7 +202,7 @@ export default function RiskMap({ data, viewMode = '3d', layersOn, pathState = '
   const rainSeeds = useMemo(() => Array.from({ length: RAIN_DROPS }, (_, i) => [hash(i, 7), hash(i, 8), hash(i, 9)]), []);
   const transformers = useMemo(() => (data?.equipment || []).filter((e) => e.kind === 'Transformer'), [data]);
   const devices = useMemo(() => (data?.equipment || []).filter((e) => e.kind !== 'Transformer'), [data]);
-  const outHomes = useMemo(() => homes.filter((h) => h.outage_p >= OUTAGE_P), [homes]);
+  const outHomes = useMemo(() => homes.filter((h) => h.out || h.outage_p >= OUTAGE_P), [homes]);
   const footprintData = useMemo(() => (data?.home && footprint ? [{ position: data.home, radius: footprint }] : []),
     [data?.home, footprint]);
   const supplyData = useMemo(() => (supply ? [supply] : []), [supply]);
@@ -283,13 +294,15 @@ export default function RiskMap({ data, viewMode = '3d', layersOn, pathState = '
     // ---- homes ----
     layersOn.homes && is3d && new SimpleMeshLayer({
       id: 'homes--3d', data: homes, mesh: MESHES.house, pickable: true, getPosition: (d) => d.position,
-      getOrientation: (d) => [0, d.yaw, 0], getScale: (d) => d.scale, getColor: (d) => outageColor(d.outage_p),
-      updateTriggers: { getColor: trig }, transitions: fade,
+      getOrientation: (d) => [0, d.yaw, 0], getScale: (d) => d.scale,
+      getColor: (d) => (d.out ? RED : outageColor(d.outage_p)), updateTriggers: { getColor: [trig, affected] },
+      transitions: fade,
     }),
     layersOn.homes && is3d && new SimpleMeshLayer({
       id: 'homes--windows', data: homes, mesh: MESHES.windows, getPosition: (d) => d.position,
       getOrientation: (d) => [0, d.yaw, 0], getScale: (d) => d.scale,
-      getColor: (d) => (d.outage_p >= OUTAGE_P ? [45, 52, 64] : [255, 214, 120]), updateTriggers: { getColor: trig },
+      getColor: (d) => (d.out || d.outage_p >= OUTAGE_P ? [45, 52, 64] : [255, 214, 120]),
+      updateTriggers: { getColor: [trig, affected] },
     }),
     layersOn.homes && new ScatterplotLayer({
       id: 'homes--out', data: outHomes, radiusUnits: 'meters', stroked: true,
@@ -298,9 +311,27 @@ export default function RiskMap({ data, viewMode = '3d', layersOn, pathState = '
     }),
     layersOn.homes && !is3d && new ScatterplotLayer({
       id: 'homes--2d', data: homes, pickable: true, getPosition: (d) => d.position, radiusUnits: 'meters',
-      radiusMinPixels: 3, getRadius: (d) => (d.is_you ? 12 : 7), getFillColor: (d) => outageColor(d.outage_p),
+      radiusMinPixels: 3, getRadius: (d) => (d.is_you ? 12 : 7), getFillColor: (d) => (d.out ? RED : outageColor(d.outage_p)),
       stroked: true, getLineColor: (d) => (d.is_you ? [15, 23, 42] : [255, 255, 255]), lineWidthUnits: 'pixels',
-      getLineWidth: (d) => (d.is_you ? 2.5 : 1), updateTriggers: { getFillColor: trig },
+      getLineWidth: (d) => (d.is_you ? 2.5 : 1), updateTriggers: { getFillColor: [trig, affected] },
+    }),
+    // ---- current outage: affected area + fault ----
+    outageArea.length > 0 && new PolygonLayer({
+      id: 'outage-area', data: outageArea, pickable: true, getPolygon: (d) => d.polygon, stroked: true, filled: true,
+      getFillColor: [239, 68, 68, 45], getLineColor: [220, 38, 38, 230], lineWidthUnits: 'pixels', getLineWidth: 2.5,
+      opacity: 0.55 + 0.45 * pulse,
+    }),
+    fault.length > 0 && new ScatterplotLayer({
+      id: 'outage-fault', data: fault, pickable: true, parameters: ON_TOP, radiusUnits: 'pixels',
+      getPosition: (d) => [...d.position, is3d ? PATH_Z : 0], getRadius: 9, radiusScale: 0.9 + 0.5 * pulse,
+      getFillColor: RED, stroked: true, getLineColor: [255, 255, 255], lineWidthUnits: 'pixels', getLineWidth: 3,
+      updateTriggers: { getPosition: is3d },
+    }),
+    fault.length > 0 && new TextLayer({
+      id: 'outage-fault-label', data: fault, parameters: ON_TOP, getPosition: (d) => [...d.position, is3d ? PATH_Z : 0],
+      getText: (d) => `Fault: ${d.cause}`, getSize: 13, getColor: [255, 255, 255], getPixelOffset: [0, 26],
+      fontFamily: 'Inter, system-ui, sans-serif', fontWeight: 700, background: true, getBackgroundColor: [185, 28, 28, 235],
+      backgroundPadding: [6, 4], characterSet: 'auto', updateTriggers: { getPosition: is3d },
     }),
     // ---- weather ----
     rain.length > 0 && new LineLayer({

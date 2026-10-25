@@ -13,8 +13,8 @@ An AI assistant that answers a customer's storm questions ("Will I lose power?",
 | LLM assistant (Groq → Gemini fallback, grounding check, offline mode) | ✅ Done, live-tested with Groq |
 | Live weather forecast → storm size for the model (Open-Meteo) | ✅ Done |
 | React frontend: forecast-driven 2D/3D map (generic houses, trees, poles, equipment) + chat | ✅ Done |
-| Sandbox area + notifications | ✅ Done |
-| Tests | ✅ 125 backend tests + scripted browser walkthrough |
+| Storm test + Outage test areas, outage details panel, notifications | ✅ Done |
+| Tests | ✅ 134 backend tests + scripted browser walkthrough |
 
 ## Quick start
 
@@ -57,7 +57,7 @@ You need **Docker Desktop**, with at least 6 GB of memory. You also need the cha
 ```bash
 docker compose run --rm ml pytest -q tests
 ```
-Expected: `125 passed`. If no `GROQ_API_KEY` is set, the live-LLM test is reported as skipped. The suite covers:
+Expected: `134 passed`. If no `GROQ_API_KEY` is set, the live-LLM test is reported as skipped. The suite covers:
 - data loading and row counts
 - training quality and no data leakage between storms
 - the model's link to the database
@@ -66,6 +66,7 @@ Expected: `125 passed`. If no `GROQ_API_KEY` is set, the live-LLM test is report
 - privacy (no Life Support/THREAT flag, IDs or coordinates in any output)
 - the assistant's routing, refusals, fallbacks and grounding check
 - the full 8-beat demo
+- outages: affected area from the real topology, ETR after the report time, map clicks resolved to equipment, nothing written
 
 **B. Try the main calls by hand:**
 ```bash
@@ -85,27 +86,32 @@ curl -X POST localhost:8000/chat -H 'content-type: application/json' \
 
 **D. Click through the app** at http://localhost:5173:
 1. Use the demo address.
-2. Look at the 3D map for today's real forecast (usually mostly green), then drag the forecast day slider.
-3. Tick **What if a storm like Feb 2025 hit?** and watch homes, poles and wires turn orange and red.
-4. Tap **Will I lose power?** You get an answer, what could change it, and a confidence meter.
-5. Tap **How long would repairs take?** on a far-out forecast day. Confidence drops below 60%, and the missing data is listed.
-6. Switch between **2D** and **3D**.
+2. Look at the 3D map for today's real forecast (usually mostly green), then drag the forecast day slider. The "No outages reported at your home" chip shows there's no current outage.
+3. Tap **Will I lose power?** You get an answer, what could change it, and a confidence meter.
+4. Tap **How long would repairs take?** on a far-out forecast day. Confidence drops below 60%, and the missing data is listed.
+5. Switch between **2D** and **3D**.
+6. Open **Storm test**, drag the intensity slider to 5 and watch homes, poles and wires turn orange and red. Toasts appear and fade after about 4 s.
+7. Open **Outage test**, press **Start outage**, then click a pole or wire elsewhere on the map. The outage panel shows where it is, the area affected, when it was reported, the estimated fix (day, month, year) and why it takes that long. Ask **How long until my power is back?**, then press **Restore power**.
 
 **E. See the controls:** `curl "localhost:8000/audit?limit=10"` shows every tool call, with a masked input, the fields returned and the fields redacted.
 
-## Two areas: My home and Sandbox
+## Three areas: My home, Storm test and Outage test
 
-- **My home** (`#/`) is what a customer sees. It shows the live 7-day forecast, the outage model's prediction for the selected day, and the chat.
-- **Sandbox** (`#/sandbox`, marked DEMO) is for testing and demos. It has sliders for **storm intensity (1–5)**, **available crews (1–30)**, **storm duration (1–5 days)** and the **affected area** (metres or yards, centered on the home).
+- **My home** (`#/`) is what a customer sees. It shows the live 7-day forecast, the outage model's prediction for the selected day, and the chat. If the outage feed reports an outage at the home (in this project, the demo storm timeline after `POST /storm/advance`), the **outage panel** appears; otherwise a small "No outages reported at your home" chip shows.
+- **Storm test** (`#/storm-test`; `#/sandbox` still works) has sliders for **storm intensity (1–5)**, **available crews (1–30)**, **storm duration (1–5 days)** and the **affected area** (metres or yards, centered on the home).
   - **Play storm** ramps the storm up and back down.
-  - **Simulate outage at my home** fires an outage alert.
   - The map, the notifications and the chat all react to the sliders.
   - It uses the real model read-only; nothing is saved (a test checks this).
-- **Notifications** pop up when the forecast, your outage risk, the repair estimate or the number of nearby predicted outages changes. Real outage events also arrive over SSE. A bell keeps the history, and desktop alerts are optional.
+- **Outage test** (`#/outage-test`) simulates a real outage. Pick where the fault is from the equipment on your supply path (transformer, fuses, reclosers) **or click any pole, wire or piece of equipment on the map**. Choose a cause (tree, broken pole, vehicle, transformer failure, lightning, equipment failure), how long ago it was reported (0–24 h) and the crews (1–30), then **Start outage** / **Restore power**.
+  - The map draws the affected area (red polygon), the fault pin, and turns affected homes red with dark windows.
+  - The chat knows the power is out and answers repair-time questions from this outage.
+  - Test outages stay in this tab and are never saved.
+- **The outage panel** (same in My home and Outage test) shows the cause, **where** the fault is, the **area affected** (homes, km², streets), when it was **reported** and the **estimated fix** with its likely range (dates like "Sat, 24 Oct 2026, 10:18 pm"), progress so far, and **why it will take about X hours** (repair work, crews and arrival, upstream-first order, travel/safety factor).
+- **Notifications** pop up when the forecast, your outage risk, the repair estimate, the number of nearby predicted outages or an outage changes. Real outage events also arrive over SSE. Toasts disappear after 4 s (hovering pauses that), at most 3 show at once, and a repeat of the same alert replaces the earlier one. A bell keeps the history, and desktop alerts are optional.
 
 ## Frontend: forecast-driven 2D/3D map + chat
 
-The map is on the left and the chat on the right. Everything on the map is the **outage model's prediction for one day of the live weather forecast** (Open-Meteo, from today through 6 days out). Use the **Sandbox** to see the map under a storm on a calm week.
+The map is on the left and the chat on the right. Everything on the map is the **outage model's prediction for one day of the live weather forecast** (Open-Meteo, from today through 6 days out). Use **Storm test** to see the map under a storm on a calm week.
 
 | Control | What it does |
 |---|---|
@@ -215,9 +221,12 @@ flowchart LR
 | `POST /tools/check_alert_eligibility` | Which documented alert rules fire (channel, timing, escalation) |
 | `POST /tools/draft_message` | `pre_storm`, `outage_confirmed`, `estimate_updated`, `restored` SMS (≤320 chars) |
 | `POST /storm/advance` · `/storm/reset` · `GET /storm/state` · `/storm/events` (SSE) · `/storm/messages` | Demo storm timeline and proactive messages |
-| `POST /chat` | `{reply, question_type, what_could_change, confidence: {score, label, missing}, storm, tools_used, mode}`; send `storm: {mode, day}` to match the map |
+| `POST /chat` | `{reply, question_type, what_could_change, confidence: {score, label, missing}, storm, tools_used, mode}`; send `storm: {mode, day}` to match the map and `outage: {...}` during an Outage test |
 | `GET /audit` | Tool-call audit log |
-| `GET /map/context?premise=&day=` · `&mode=replay&storm=feb2025` | Map payload: homes, poles, equipment, 3D lines, supply path, forecast, your risk |
+| `GET /map/context?premise=&day=` · `&mode=sandbox&intensity=&crews=&duration_days=&radius_m=` | Map payload: homes, poles, equipment, 3D lines, supply path, forecast, your risk (Storm test: simulated storm + restoration) |
+| `GET /outages/current?premise=` | The current outage at this home from the outage feed (demo timeline), or `null` |
+| `GET /outage-test/devices?premise=` | Equipment on the home's supply path to pick as a fault location |
+| `GET /outage-test?premise=&device=` · `&lat=&lon=` · `&cause=&reported_hours_ago=&crews=` | Simulated outage: location, affected area, reported time, ETR range, why it takes that long (read-only, audited) |
 | `GET /forecast?premise=` | Live 7-day forecast and the storm size each day implies |
 | `GET /health` | Readiness |
 
@@ -231,11 +240,13 @@ backend/
   privacy.py      redaction + audit        assistant.py   LLM middleware
   storm.py        demo timeline            lookup.py      address / map lookup
   mapdata.py      map payload            forecast.py    live forecast -> storm size
+  outages.py      outage records: fault location, affected area, ETR and why
   confidence.py   confidence score, missing data, what could change the answer
   demo/           scenario.json, DEMO_SCRIPT.md, cache.json, build_cache.py
   tests/          pytest suite
 frontend/         React app (Vite)
-  src/            RiskMap (deck.gl 2D/3D), meshes.js (generic models), trees.js (OSM trees), ChatPanel, ConfidenceMeter
+  src/            RiskMap (deck.gl 2D/3D), meshes.js (generic models), trees.js (OSM trees), ChatPanel, ConfidenceMeter,
+                  SandboxPanel (Storm test), OutageTestPanel, OutageCard, Notifications
 ```
 
 ## Known limitations

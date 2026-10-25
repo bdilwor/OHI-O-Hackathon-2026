@@ -6,17 +6,21 @@
 |---|---|---|---|
 | 0 | Find the home | **try the demo address** → **Yes, this is my home** | Colorful 3D neighborhood: houses with lit windows, trees, poles, sagging wires; supply path with flowing current |
 | 1 | Live forecast (**My home**) | Drag the forecast day slider; ask "Will I lose power?" | Real forecast drives the model; answer + "what could change this" + confidence meter |
-| 2 | Switch to **Sandbox** | Click the Sandbox tab | Purple SANDBOX banner: simulated, nothing saved |
-| 3 | Big storm | Intensity slider → 5 | Rain, houses turn orange/red, windows go dark with red rings; notifications "Outage likely at your home", "Repair estimate longer" |
+| 2 | Switch to **Storm test** | Click the Storm test tab | Storm sliders; everything simulated, nothing saved |
+| 3 | Big storm | Intensity slider → 5 | Rain, houses turn orange/red, windows go dark with red rings; notifications "Outage likely at your home", "Repair estimate longer" (each fades after ~4 s) |
 | 4 | Crews and duration | Crews → 20, then duration → 3 days | Repair estimate shortens, then lengthens (toasts + readout) |
 | 5 | Affected area | Shrink the area to 300 m (toggle m/yd) | Only the nearby circle stays red; the rest calms down |
 | 6 | Play storm | **▶ Play storm** | The storm ramps up and down over ~15 s, firing notifications |
-| 7 | Simulated outage | **Simulate outage at my home** | Outage alert toast + proactive chat message with the repair range |
-| 8 | Chat reacts | Ask "How long would repairs take?" | Answer for the simulated storm, what could change it, confidence |
-| 9 | Refusal / medical | "Where are the crews right now?" · "I use an oxygen concentrator" | Polite refusal; tailored safety steps + callback eligibility |
-| 10 | 2D / 3D | Toggle **2D** | Flat map of the same prediction |
+| 7 | Switch to **Outage test** | Click the Outage test tab; cause "Tree on the power line"; **Start outage** | Red affected-area polygon + fault pin; outage panel: where, ~N homes / km² / streets, reported and estimated fix (e.g. "Sun, 25 Oct 2026, 1:18 am"), why it takes ~X h; toast + proactive chat message |
+| 8 | Move the fault | Pick the recloser in "Where is the fault?", then click a pole elsewhere on the map | The affected area grows with the recloser; a clicked pole on another branch may leave your home unaffected |
+| 9 | Chat reacts | Ask "How long until my power is back?" · drag crews | Answer uses the outage's dates; more crews → earlier fix ("Estimated fix time updated") |
+| 10 | Restore | **Restore power** | "Power restored" toast; the supply path turns green |
+| 11 | Refusal / medical | "Where are the crews right now?" · "I use an oxygen concentrator" | Polite refusal; tailored safety steps + callback eligibility |
+| 12 | 2D / 3D | Toggle **2D** | Flat map of the same prediction |
 
-**Point out:** the 🔔 notification history, the **Privacy & audit log** (sandbox calls are tagged `sandbox`), and **Demo-safe mode**.
+**Point out:** the 🔔 notification history, the **Privacy & audit log** (Storm test calls are tagged `sandbox`, Outage test calls `outage_test`), and **Demo-safe mode**.
+
+**Real outage feed on My home:** `curl -X POST localhost:8000/storm/advance` (the outage is confirmed on the next beat; `/storm/reset` clears it). The outage panel appears on **My home** with the timeline's damage and crews.
 
 ## API version (curl)
 

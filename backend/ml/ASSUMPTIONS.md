@@ -222,7 +222,7 @@ Replaced parts count removal + install hours; new connectors count install only.
   - **Outage chance:** the forecast driver, the top model factor, and local damage history.
   - **Repair time:** the bottleneck device, crew count and arrival, and fallen trees or blocked roads.
 
-## Sandbox (demo/testing only, `backend/tools.py: sandbox_storm`)
+## Storm test (testing only, `backend/tools.py: sandbox_storm`)
 - **Intensity 1–5 maps to storm size** (expected area damage reports): 12, 60, 194 (Sep 2024 size), 600, 1,254 (Feb 2025 size).
 - **Duration:** multiplies storm size by `1 + 0.35 × (days − 1)` (capped at 2,000). Crews arrive after `12 h × days`, once the storm passes.
 - **Affected area:** a circle centered on the home. Equipment outside it gets calm-weather risk (storm size 0.5).
@@ -232,4 +232,31 @@ Replaced parts count removal + install hours; new connectors count install only.
 ## Map visuals
 - **Yard trees:** placed around real house positions (0–2 per house, 14–24 m away) and in any OSM residential areas. Their exact spots are illustrative. Wooded-area trees follow real OSM polygons.
 - **Windows:** go dark and a red ring pulses when a home's predicted outage chance is 50% or more.
-- **Rain and tree sway:** scale with the forecast gusts, or with the sandbox intensity.
+- **Rain and tree sway:** scale with the forecast gusts, or with the Storm test intensity.
+
+## Outages (`backend/outages.py`: outage panel and Outage test)
+- **Fault → protective device:**
+  - A picked device (transformer, fuse, recloser on the home's supply path) is used directly.
+  - A map click snaps to the nearest equipment within 40 m (farther away, the user is asked to click closer).
+  - A click on a pole or wire is assumed to trip the nearest fuse or recloser on the same circuit within 400 m. In reality, coordination studies decide which device operates.
+- **Affected area:**
+  - Every premise downstream of that device in the real topology graph.
+  - The map shows a padded convex hull, its area in km², and the most common streets.
+  - Only positions within 1 km of the home are sent; no IDs are sent.
+- **Cause → repair work:** maps to STORMS job types.
+  - tree → primary wire
+  - broken pole → pole + wire
+  - vehicle → pole
+  - transformer failure → transformer
+  - lightning → fuse
+  - equipment failure → the faulted device
+- **Repair time:**
+  - The restoration Monte Carlo runs with that confirmed damage, calm weather around the fault (storm size 0.5), the chosen crews, and a first crew arriving about 1 h after the report.
+  - **ETR = reported time + P10/P50/P90 hours.** Times are shown in America/New_York, formatted as day, month, year.
+- **"Why it takes X hours":** generated from the same inputs, so it never contradicts the estimate:
+  - repair crew-hours from the STORMS bundle
+  - crews and their arrival
+  - upstream-first repair order and the bottleneck
+  - AEP's 4.5× indirect-labor factor
+- **Current outage (My home):** the outage feed is the demo storm timeline. It uses the timeline's assessed damage, crews and hours since the outage, and applies only to the demo home.
+- **Read-only:** Outage test calls write nothing (tested). They are tagged `outage_test` in the audit log.

@@ -24,7 +24,8 @@ SANDBOX_DURATION_FACTOR = 0.35
 SANDBOX_DELAY_HRS_PER_DAY = 12.0
 CALM_N = 0.5
 SERVICE_AREA_CENTER = (37.27, -79.94)  # forecast location when the premise is unknown
-TOOL_NAMES = ("get_outage_risk", "estimate_restoration", "prep_guidance", "check_alert_eligibility", "draft_message")
+TOOL_NAMES = ("get_outage_risk", "estimate_restoration", "prep_guidance", "check_alert_eligibility", "draft_message",
+              "outage_restoration")
 
 
 class ToolBox:
@@ -36,6 +37,7 @@ class ToolBox:
         self.storm = storm
         self.audit = audit
         self.forecast = forecast or ForecastService(scorer.levels)
+        self.outages = None  # OutageService, attached at startup (main.build_state)
         self.to_wgs = Transformer.from_crs(METRIC_CRS, 4326, always_xy=True)
         self._cache: dict = {}
 
@@ -136,6 +138,24 @@ class ToolBox:
                 self._cache.pop(next(iter(self._cache)))
             self._cache[key] = compute()
         return copy.deepcopy(self._cache[key])
+
+    def outage_restoration(self, premise: str, outage: dict) -> dict:
+        """Restoration for a confirmed (test) outage: the fault's damage is known, so this is the repair estimate."""
+        rec = self.outages.test(premise, **outage)
+        st = {"mode": "outage", "label": "Outage", "summary": "the confirmed outage at your home",
+              "when": "for this outage", "hypothetical": False, "forecast_available": True, "lead_days": 0}
+        h = rec["hours"]
+        est = {"outage_confirmed": True, "cause": rec["cause"], "location": rec["location"],
+               "homes_affected": rec["affected"]["homes"], "reported": rec["reported_display"],
+               "most_likely_fixed_by": rec["etr_display"]["p50"], "fixed_between": [rec["etr_display"]["p10"],
+                                                                                   rec["etr_display"]["p90"]],
+               "p10_hrs": h["p10"], "p50_hrs": h["p50"], "p90_hrs": h["p90"], "hours_elapsed": h["elapsed"],
+               "bottleneck_device": rec["bottleneck"], "why": rec["why"], "scenario": {"crews": rec["crews"]},
+               "storm": st}
+        est["confidence_meter"] = confidence.assess("restoration", storm=st, damage_assessed=True,
+                                                    **self._support(premise))
+        est["what_could_change"] = confidence.restoration_changers(est)
+        return est
 
     def prep_guidance(self, premise: str, declared_needs: list[str] | None = None, storm: dict | None = None) -> dict:
         risk = self.get_outage_risk(premise, storm=storm)
