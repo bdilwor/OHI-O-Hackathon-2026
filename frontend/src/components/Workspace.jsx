@@ -41,18 +41,21 @@ export default function Workspace({ kind, home, space, setSpace, notify, onMapCl
 
   // Fetch the model's prediction; diff against the previous snapshot for notifications.
   const refresh = useRef(null);
+  const latest = useRef(0);
   refresh.current = async (quiet = false) => {
     if (!premise) return;
+    const ticket = ++latest.current;
     if (!quiet) setLoading(true);
     try {
       const d = await api.mapContext(premise, storm);
+      if (ticket !== latest.current) return; // a newer slider position is already on its way
       notify(diffSnapshots(lastSnap.current, d, { sandbox }));
       lastSnap.current = d;
       set({ mapData: d });
     } catch (e) {
       onError(e.message);
     } finally {
-      setLoading(false);
+      if (ticket === latest.current) setLoading(false);
     }
   };
   useEffect(() => { refresh.current(); }, [premise, JSON.stringify(storm)]); // eslint-disable-line react-hooks/exhaustive-deps

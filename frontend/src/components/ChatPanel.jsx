@@ -40,7 +40,8 @@ function Message({ m }) {
   );
 }
 
-export default function ChatPanel({ messages, busy, onSend, needs, onToggleNeed, demoSafe, onDemoSafe, disabled }) {
+export default function ChatPanel({ messages, busy, onSend, needs, onToggleNeed, demoSafe, onDemoSafe, disabled,
+                                    sandbox = false }) {
   const [text, setText] = useState('');
   const endRef = useRef(null);
   useEffect(() => { endRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' }); }, [messages, busy]);
@@ -50,8 +51,10 @@ export default function ChatPanel({ messages, busy, onSend, needs, onToggleNeed,
   return (
     <>
       <div className="chat-head">
-        <h2>Outage Concierge</h2>
-        <p>Answers come from AEP data, the outage model and the live forecast for the day shown on the map.</p>
+        <h2>Outage Concierge {sandbox && <span className="tag sandbox">sandbox</span>}</h2>
+        <p>{sandbox
+          ? 'Answers use the real outage model with your simulated storm settings.'
+          : 'Answers come from AEP data, the outage model and the live forecast for the day shown on the map.'}</p>
         <div className="needs" role="group" aria-label="Tell us about needs at home (optional)">
           {NEEDS.map((n) => (
             <button key={n.id} type="button" className="need" aria-pressed={needs.includes(n.id)}

@@ -12,13 +12,13 @@ export default function SandboxPanel({ value, onChange, onSimulateOutage, restor
   const timer = useRef(null);
   const play = useRef(null);
 
-  // Debounce slider drags so the map recomputes once the hand stops (~300 ms).
+  // Debounce slider drags so the map recomputes once the hand stops (~200 ms).
   useEffect(() => { setDraft(value); }, [value]);
   const update = (patch) => {
     const next = { ...draft, ...patch };
     setDraft(next);
     clearTimeout(timer.current);
-    timer.current = setTimeout(() => onChange(next), 300);
+    timer.current = setTimeout(() => onChange(next), 200);
   };
   useEffect(() => () => { clearTimeout(timer.current); clearInterval(play.current); }, []);
 

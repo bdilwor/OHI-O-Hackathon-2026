@@ -26,7 +26,8 @@ const YOUR_HOUSE = [2.5, 2.5, 2.5];
 const GEAR = [1.6, 1.6, 1.4];
 const TREE = 1.3;
 const PARTICLES = 7;
-const RAIN_DROPS = 900;
+const RAIN_DROPS = 420;
+const FPS = 20;
 const M_PER_DEG = 111320;
 const ON_TOP = { depthCompare: 'always' };
 const LIGHTS = new LightingEffect({
@@ -52,11 +53,12 @@ const hash = (a, b = 0) => { const s = Math.sin(a * 12.9898 + b * 78.233) * 4375
 function styleBasemap(map) {
   for (const layer of map.getStyle().layers) {
     if (layer.type !== 'line' || layer['source-layer'] !== 'roads') continue;
-    try {
-      const w = map.getPaintProperty(layer.id, 'line-width');
-      if (typeof w === 'number') map.setPaintProperty(layer.id, 'line-width', w * 1.5);
-      else if (w) map.setPaintProperty(layer.id, 'line-width', ['*', 1.5, w]);
-    } catch { /* expression we can't scale: leave it */ }
+    const w = map.getPaintProperty(layer.id, 'line-width');
+    let wider = null;
+    if (typeof w === 'number') wider = w * 1.5;
+    else if (w?.stops) wider = { ...w, stops: w.stops.map(([z, v]) => [z, v * 1.5]) }; // legacy zoom function
+    else if (Array.isArray(w)) wider = ['*', 1.5, w];                                   // expression
+    if (wider !== null) map.setPaintProperty(layer.id, 'line-width', wider);
   }
   try {
     map.setSky({ 'sky-color': '#7cc3f5', 'horizon-color': '#e0f2fe', 'fog-color': '#f1f5f9',
@@ -104,7 +106,7 @@ function useAnimationTime(active) {
     let last = 0;
     const start = performance.now();
     const tick = (now) => {
-      if (now - last > 33) { last = now; setTime((now - start) / 1000); } // ~30 fps is plenty
+      if (now - last > 1000 / FPS) { last = now; setTime((now - start) / 1000); }
       raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);
@@ -187,24 +189,30 @@ export default function RiskMap({ data, viewMode = '3d', layersOn, pathState = '
     return nodes.length < 2 ? null : { path: [...nodes].reverse().map((n) => [...n.position, z]) };
   }, [data, is3d]);
   const rainSeeds = useMemo(() => Array.from({ length: RAIN_DROPS }, (_, i) => [hash(i, 7), hash(i, 8), hash(i, 9)]), []);
+  const transformers = useMemo(() => (data?.equipment || []).filter((e) => e.kind === 'Transformer'), [data]);
+  const devices = useMemo(() => (data?.equipment || []).filter((e) => e.kind !== 'Transformer'), [data]);
+  const outHomes = useMemo(() => homes.filter((h) => h.outage_p >= OUTAGE_P), [homes]);
+  const footprintData = useMemo(() => (data?.home && footprint ? [{ position: data.home, radius: footprint }] : []),
+    [data?.home, footprint]);
+  const supplyData = useMemo(() => (supply ? [supply] : []), [supply]);
 
   // ---- animation-dependent pieces ----
   const flow = supply ? flowPoints(supply.path, (time * 0.18) % 1) : [];
-  const swayAmp = 1.5 + wind * 9;                    // degrees
-  const swayT = Math.floor(time * 15);              // throttle sway updates
-  const pulse = 0.5 + 0.5 * Math.sin(time * 4);
+  const lean = 2 + wind * 14;                        // trees lean with the wind (static: no per-frame updates)
+  const pulse = 0.5 + 0.5 * Math.sin(time * 4);      // drives layer-wide opacity/scale uniforms only
+  const rainTick = Math.floor(time * 15);
   const rain = useMemo(() => {
     if (!data?.home || wind < 0.35 || !is3d) return [];
     const n = Math.round(RAIN_DROPS * Math.min(1, (wind - 0.25) * 1.4));
     const mLon = M_PER_DEG * Math.cos((lat * Math.PI) / 180);
     const slant = 6 + wind * 14;
     return rainSeeds.slice(0, n).map(([a, b, c]) => {
-      const z = 80 - ((c * 80 + time * 55) % 80);
+      const z = 80 - ((c * 80 + (rainTick / 15) * 55) % 80);
       const x = data.home[0] + ((a - 0.5) * 1100 + slant * (80 - z) / 8) / mLon;
       const y = data.home[1] + (b - 0.5) * 1100 / M_PER_DEG;
       return { from: [x, y, z + 5], to: [x + slant / mLon, y, z] };
     });
-  }, [data, wind, is3d, time, rainSeeds, lat]);
+  }, [data, wind, is3d, rainTick, rainSeeds, lat]);
 
   const pathColor = PATH_COLORS[pathState] || PATH_COLORS.normal;
   const bottleneckLabel = bottleneck?.toLowerCase();
@@ -214,18 +222,18 @@ export default function RiskMap({ data, viewMode = '3d', layersOn, pathState = '
   const treeLayer = (id, items, mesh, colorFn, pickable) => new SimpleMeshLayer({
     id, data: items, mesh, pickable, getPosition: (d) => d.position,
     getScale: (d) => [d.scale * TREE, d.scale * TREE, d.scale * TREE],
-    getOrientation: (d) => [Math.sin(swayT / 15 + d.phase) * swayAmp, d.yaw, Math.cos(swayT / 19 + d.phase) * swayAmp * 0.6],
-    getColor: colorFn, updateTriggers: { getOrientation: [swayT, swayAmp], getColor: trig }, transitions: fade,
+    getOrientation: (d) => [lean * (0.7 + 0.3 * Math.sin(d.phase)), d.yaw, lean * 0.3 * Math.cos(d.phase)],
+    getColor: colorFn, updateTriggers: { getOrientation: lean, getColor: trig }, transitions: fade,
   });
   const leafColor = (d) => shade(outageColor(d.outage_p).map((v, k) => v * 0.55 + [40, 120, 60][k] * 0.45), d.tint);
 
   const layers = !data ? [] : [
     // ---- sandbox storm footprint ----
     footprint && new ScatterplotLayer({
-      id: 'footprint', data: [{ position: data.home, radius: footprint }], pickable: !is3d, radiusUnits: 'meters',
+      id: 'footprint', data: footprintData, pickable: !is3d, radiusUnits: 'meters',
       getPosition: (d) => d.position, getRadius: (d) => d.radius, filled: true, stroked: true,
-      getFillColor: [124, 58, 237, 22 + 18 * pulse], getLineColor: [124, 58, 237, 200], lineWidthUnits: 'pixels',
-      getLineWidth: 2.5, updateTriggers: { getFillColor: Math.round(pulse * 10) },
+      getFillColor: [124, 58, 237, 40], getLineColor: [124, 58, 237, 220], lineWidthUnits: 'pixels',
+      getLineWidth: 2.5, opacity: 0.6 + 0.4 * pulse,
     }),
     // ---- trees (3D only) ----
     is3d && layersOn.trees && treeLayer('trees--pine-trunk', pines, MESHES.pineTrunk, [255, 255, 255], false),
@@ -235,7 +243,7 @@ export default function RiskMap({ data, viewMode = '3d', layersOn, pathState = '
     // ---- grid ----
     layersOn.grid && is3d && new PathLayer({
       id: 'lines-glow', data: hotLines, getPath: (d) => d.path, widthUnits: 'pixels', getWidth: 7,
-      getColor: (d) => [...riskColor(d.p), 40 + 60 * pulse], updateTriggers: { getColor: [trig, Math.round(pulse * 8)] },
+      getColor: (d) => [...riskColor(d.p), 110], updateTriggers: { getColor: trig }, opacity: 0.35 + 0.65 * pulse,
     }),
     layersOn.grid && new PathLayer({
       id: 'lines', data: is3d ? lines3d : lines2d, pickable: true, getPath: (d) => d.path, widthUnits: 'pixels',
@@ -253,13 +261,13 @@ export default function RiskMap({ data, viewMode = '3d', layersOn, pathState = '
       getScale: [1.5, 1.5, 1.3], getColor: [236, 240, 245],
     }),
     layersOn.grid && is3d && new SimpleMeshLayer({
-      id: 'equipment--transformer', data: data.equipment.filter((e) => e.kind === 'Transformer'),
+      id: 'equipment--transformer', data: transformers,
       mesh: MESHES.transformer, pickable: true, getPosition: (d) => d.position, getScale: GEAR,
       getColor: (d) => [148, 163, 184].map((v, k) => v * 0.6 + riskColor(d.p)[k] * 0.4),
       updateTriggers: { getColor: trig }, transitions: fade,
     }),
     layersOn.grid && is3d && new SimpleMeshLayer({
-      id: 'equipment--device', data: data.equipment.filter((e) => e.kind !== 'Transformer'), mesh: MESHES.device,
+      id: 'equipment--device', data: devices, mesh: MESHES.device,
       pickable: true, getPosition: (d) => d.position, getScale: GEAR, getColor: (d) => riskColor(d.p),
       updateTriggers: { getColor: trig }, transitions: fade,
     }),
@@ -284,10 +292,9 @@ export default function RiskMap({ data, viewMode = '3d', layersOn, pathState = '
       getColor: (d) => (d.outage_p >= OUTAGE_P ? [45, 52, 64] : [255, 214, 120]), updateTriggers: { getColor: trig },
     }),
     layersOn.homes && new ScatterplotLayer({
-      id: 'homes--out', data: homes.filter((h) => h.outage_p >= OUTAGE_P), radiusUnits: 'meters', stroked: true,
-      filled: false, getPosition: (d) => d.position, getRadius: 9 + 7 * pulse, lineWidthUnits: 'pixels',
-      getLineWidth: 2, getLineColor: [220, 38, 38, 90 + 140 * (1 - pulse)],
-      updateTriggers: { getRadius: Math.round(pulse * 10), getLineColor: Math.round(pulse * 10) },
+      id: 'homes--out', data: outHomes, radiusUnits: 'meters', stroked: true,
+      filled: false, getPosition: (d) => d.position, getRadius: 10, radiusScale: 0.9 + 0.7 * pulse,
+      lineWidthUnits: 'pixels', getLineWidth: 2, getLineColor: [220, 38, 38, 230], opacity: 1 - 0.6 * pulse,
     }),
     layersOn.homes && !is3d && new ScatterplotLayer({
       id: 'homes--2d', data: homes, pickable: true, getPosition: (d) => d.position, radiusUnits: 'meters',
@@ -302,11 +309,11 @@ export default function RiskMap({ data, viewMode = '3d', layersOn, pathState = '
     }),
     // ---- your supply path ----
     layersOn.path && supply && new PathLayer({
-      id: 'path-glow', data: [supply], getPath: (d) => d.path, widthUnits: 'pixels', getWidth: 11,
+      id: 'path-glow', data: supplyData, getPath: (d) => d.path, widthUnits: 'pixels', getWidth: 11,
       getColor: [...pathColor, 70], capRounded: true, jointRounded: true, parameters: ON_TOP,
     }),
     layersOn.path && supply && new PathLayer({
-      id: 'path-core', data: [supply], getPath: (d) => d.path, widthUnits: 'pixels', getWidth: 3,
+      id: 'path-core', data: supplyData, getPath: (d) => d.path, widthUnits: 'pixels', getWidth: 3,
       getColor: [...pathColor, 240], capRounded: true, jointRounded: true, parameters: ON_TOP,
     }),
     layersOn.path && flow.length > 0 && new ScatterplotLayer({

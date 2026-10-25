@@ -4,18 +4,19 @@
 
 | # | Beat | What to do | What judges see |
 |---|---|---|---|
-| 0 | Find the home | **try the demo address** → **Yes, this is my home** | 3D neighborhood: generic houses, poles, transformers, wires, OSM trees; supply path with flowing current |
-| 1 | Live forecast | Drag the forecast day slider | Each day's real forecast (gusts, conditions) drives the model; calm days stay green |
-| 2 | "Will I lose power?" | Tap the chip | Direct answer + "what could change these odds" + confidence meter |
-| 3 | A big storm | Tick **What if a storm like Feb 2025 hit?** | Homes, poles and wires turn orange/red; your outage chance jumps (about 56%) |
-| 4 | Repair time | Tap "How long would repairs take?" | Likely range + 3 things that could change it; the bottleneck fuse is labeled on the map |
-| 5 | Low confidence | Untick the replay, slide to the last forecast day, ask about repair time | Meter below 60% lists the missing data (closer-range forecast, field assessment, crews) |
-| 6 | What-if | Ask "What if crews are delayed until tomorrow?" | "About 24 hours later than before" |
-| 7 | Medical device | Type "I use an oxygen concentrator" | Tailored safety steps; a callback is offered per the alert rules (never promised) |
-| 8 | Refusal | "Where are the crews right now?" | Polite refusal (safety + privacy) |
-| 9 | 2D / 3D | Toggle **2D** | Flat map of the same prediction |
+| 0 | Find the home | **try the demo address** → **Yes, this is my home** | Colorful 3D neighborhood: houses with lit windows, trees, poles, sagging wires; supply path with flowing current |
+| 1 | Live forecast (**My home**) | Drag the forecast day slider; ask "Will I lose power?" | Real forecast drives the model; answer + "what could change this" + confidence meter |
+| 2 | Switch to **Sandbox** | Click the Sandbox tab | Purple SANDBOX banner: simulated, nothing saved |
+| 3 | Big storm | Intensity slider → 5 | Rain, houses turn orange/red, windows go dark with red rings; notifications "Outage likely at your home", "Repair estimate longer" |
+| 4 | Crews and duration | Crews → 20, then duration → 3 days | Repair estimate shortens, then lengthens (toasts + readout) |
+| 5 | Affected area | Shrink the area to 300 m (toggle m/yd) | Only the nearby circle stays red; the rest calms down |
+| 6 | Play storm | **▶ Play storm** | The storm ramps up and down over ~15 s, firing notifications |
+| 7 | Simulated outage | **Simulate outage at my home** | Outage alert toast + proactive chat message with the repair range |
+| 8 | Chat reacts | Ask "How long would repairs take?" | Answer for the simulated storm, what could change it, confidence |
+| 9 | Refusal / medical | "Where are the crews right now?" · "I use an oxygen concentrator" | Polite refusal; tailored safety steps + callback eligibility |
+| 10 | 2D / 3D | Toggle **2D** | Flat map of the same prediction |
 
-**Controls to point out:** the **Privacy & audit log** (redacted fields per tool call), **Demo-safe mode** (pre-recorded live-LLM answers for the replay and today's forecast, in case Wi-Fi or the LLM fails), and the **hypothetical** tag on replayed storms.
+**Point out:** the 🔔 notification history, the **Privacy & audit log** (sandbox calls are tagged `sandbox`), and **Demo-safe mode**.
 
 ## API version (curl)
 

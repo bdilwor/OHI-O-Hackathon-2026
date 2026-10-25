@@ -30,6 +30,8 @@ class MapData:
         self.asset_tree = cKDTree(self.assets[["x", "y"]].to_numpy())
         self.row_by_uid = {uid: i for i, uid in enumerate(self.assets["asset_uid"])}
         self.to_wgs = Transformer.from_crs(METRIC_CRS, 4326, always_xy=True)
+        self._line_cache: dict = {}  # home -> line geometry (never changes; only risk is per storm)
+        self._path_cache: dict = {}  # premise -> upline hops
 
     def _lonlat(self, x, y) -> np.ndarray:
         x, y = np.atleast_1d(np.asarray(x, float)), np.atleast_1d(np.asarray(y, float))
@@ -100,18 +102,24 @@ class MapData:
             out.append(item)
         return out
 
-    def _lines(self, home, p_all) -> list[dict]:
+    def _line_geometry(self, home) -> list[tuple]:
+        """Lines near the home, cached: the bbox test (`&&`) uses the GIST index, then the exact distance."""
+        key = tuple(home)
+        if key in self._line_cache:
+            return self._line_cache[key]
         sql = text("""
+            WITH c AS (SELECT ST_SetSRID(ST_MakePoint(:lon, :lat), 4326) AS pt)
             SELECT 'primary' AS kind, 'primary:' || id::bigint AS uid, usage, mounting,
                    ST_AsGeoJSON(ST_Simplify(geom, :tol)) AS geojson
-            FROM primary_lines
-            WHERE ST_DWithin(geom::geography, ST_SetSRID(ST_MakePoint(:lon, :lat), 4326)::geography, :r)
+            FROM primary_lines, c
+            WHERE geom && ST_Expand(c.pt, :deg) AND ST_DWithin(geom::geography, c.pt::geography, :r)
             UNION ALL
             SELECT 'secondary', 'secondary:' || id::bigint, usage, mounting, ST_AsGeoJSON(ST_Simplify(geom, :tol))
-            FROM secondary_lines
-            WHERE ST_DWithin(geom::geography, ST_SetSRID(ST_MakePoint(:lon, :lat), 4326)::geography, :r2)""")
-        with self.engine.connect() as conn:
+            FROM secondary_lines, c
+            WHERE geom && ST_Expand(c.pt, :deg2) AND ST_DWithin(geom::geography, c.pt::geography, :r2)""")
+        with self.engine.connect() as conn:  # degrees margin covers the radius at this latitude
             rows = conn.execute(sql, {"lon": home[0], "lat": home[1], "r": RADIUS_M, "r2": SECONDARY_RADIUS_M,
+                                      "deg": RADIUS_M / 80000, "deg2": SECONDARY_RADIUS_M / 80000,
                                       "tol": SIMPLIFY_DEG}).all()
         out = []
         for kind, uid, usage, mounting, geojson in rows:
@@ -119,18 +127,26 @@ class MapData:
             parts = g["coordinates"] if g["type"] == "MultiLineString" else [g["coordinates"]]
             overhead = mounting != "Underground"
             z = OVERHEAD_Z[kind] if overhead else 0.0
-            r = self.row_by_uid.get(uid)
-            p = float(p_all[r]) if r is not None else 0.0
-            for coords in parts:
-                out.append({"path": [[round(c[0], 6), round(c[1], 6), z] for c in coords], "p": round(p, 5),
-                            "kind": kind, "overhead": overhead, "main_line": usage == "Backbone"})
+            paths = [[[round(c[0], 6), round(c[1], 6), z] for c in coords] for coords in parts]
+            out.append((self.row_by_uid.get(uid), kind, overhead, usage == "Backbone", paths))
+        self._line_cache[key] = out
+        return out
+
+    def _lines(self, home, p_all) -> list[dict]:
+        out = []
+        for r, kind, overhead, main_line, paths in self._line_geometry(home):
+            p = round(float(p_all[r]), 5) if r is not None else 0.0
+            out += [{"path": path, "p": p, "kind": kind, "overhead": overhead, "main_line": main_line} for path in paths]
         return out
 
     def _supply_path(self, premise, home, storm_n, area=None) -> list[dict]:
         """Home first, then each upline device in order (transformer -> fuses -> reclosers)."""
-        with self.engine.connect() as conn:
-            hops = conn.execute(text("SELECT subtype, location_n FROM premise_upline WHERE premise_nu = :p "
-                                     "ORDER BY hop_seq"), {"p": premise}).all()
+        if premise not in self._path_cache:
+            with self.engine.connect() as conn:
+                self._path_cache[premise] = conn.execute(text(
+                    "SELECT subtype, location_n FROM premise_upline WHERE premise_nu = :p ORDER BY hop_seq"),
+                    {"p": premise}).all()
+        hops = self._path_cache[premise]
         nodes = [{"kind": "home", "label": "Your home", "position": home, "p": None}]
         devices = self.scorer.devices
         for subtype, loc in hops:

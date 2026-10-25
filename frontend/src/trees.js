@@ -7,7 +7,7 @@ const WOODED = /wood|forest|park|nature|scrub|orchard|garden|cemetery|recreation
 const RESIDENTIAL = /residential|suburb|neighbourhood|allotments|village_green|grass|meadow/i;
 const SPACING_M = { woods: 18, yard: 38 };
 const PINE_SHARE = { woods: 0.6, yard: 0.25 };
-const HOUSE_CLEARANCE_M = 14;
+const HOUSE_CLEARANCE_M = 11;
 const MAX_TREES = 3000;
 const M_PER_DEG_LAT = 111320;
 
@@ -63,7 +63,27 @@ export function sampleTrees(map, home, radiusM, homes = []) {
                               zone === 'yard' ? nearHouse : null, MAX_TREES - trees.length);
     trees.push(...placed);
   }
-  return trees;
+  // Many suburbs have no OSM residential polygons: add yard trees around the (real) house positions too.
+  return [...trees, ...yardTrees(homes, mPerDegLon, nearHouse)].slice(0, MAX_TREES);
+}
+
+/** 0-2 illustrative yard trees per house, 14-24 m away, kept clear of every house. */
+function yardTrees(homes, mPerDegLon, nearHouse) {
+  const out = [];
+  homes.forEach((h, i) => {
+    const count = Math.floor((jitter(i, 11, 1) + 0.5) * 3); // 0, 1 or 2
+    for (let k = 0; k < count; k += 1) {
+      const ang = (jitter(i, k, 2) + 0.5) * Math.PI * 2;
+      const dist = 14 + (jitter(i, k, 3) + 0.5) * 10;
+      const x = h.position[0] + (Math.cos(ang) * dist) / mPerDegLon;
+      const y = h.position[1] + (Math.sin(ang) * dist) / M_PER_DEG_LAT;
+      if (nearHouse(x, y)) continue;
+      const r = jitter(i, k, 4) + 0.5;
+      out.push({ position: [x, y], scale: 0.75 + r * 0.55, yaw: r * 360, tint: 0.85 + r * 0.3,
+                 kind: jitter(i, k, 5) + 0.5 < PINE_SHARE.yard ? 'pine' : 'leafy', phase: r * Math.PI * 2 });
+    }
+  });
+  return out;
 }
 
 function sampleZone(feats, zone, home, mPerDegLon, r2, reject, limit) {

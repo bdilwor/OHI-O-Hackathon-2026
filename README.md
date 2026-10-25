@@ -13,7 +13,8 @@ An AI assistant that answers a customer's storm questions ("Will I lose power?",
 | LLM assistant (Groq → Gemini fallback, grounding check, offline mode) | ✅ Done, live-tested with Groq |
 | Live weather forecast → storm size for the model (Open-Meteo) | ✅ Done |
 | React frontend: forecast-driven 2D/3D map (generic houses, trees, poles, equipment) + chat | ✅ Done |
-| Tests | ✅ 116 backend tests + scripted browser walkthrough |
+| Sandbox area + notifications | ✅ Done |
+| Tests | ✅ 125 backend tests + scripted browser walkthrough |
 
 ## Quick start
 
@@ -56,7 +57,7 @@ You need **Docker Desktop**, with at least 6 GB of memory. You also need the cha
 ```bash
 docker compose run --rm ml pytest -q tests
 ```
-Expected: `116 passed`. If no `GROQ_API_KEY` is set, the live-LLM test is reported as skipped. The suite covers:
+Expected: `125 passed`. If no `GROQ_API_KEY` is set, the live-LLM test is reported as skipped. The suite covers:
 - data loading and row counts
 - training quality and no data leakage between storms
 - the model's link to the database
@@ -92,15 +93,24 @@ curl -X POST localhost:8000/chat -H 'content-type: application/json' \
 
 **E. See the controls:** `curl "localhost:8000/audit?limit=10"` shows every tool call, with a masked input, the fields returned and the fields redacted.
 
+## Two areas: My home and Sandbox
+
+- **My home** (`#/`) is what a customer sees. It shows the live 7-day forecast, the outage model's prediction for the selected day, and the chat.
+- **Sandbox** (`#/sandbox`, marked DEMO) is for testing and demos. It has sliders for **storm intensity (1–5)**, **available crews (1–30)**, **storm duration (1–5 days)** and the **affected area** (metres or yards, centered on the home).
+  - **Play storm** ramps the storm up and back down.
+  - **Simulate outage at my home** fires an outage alert.
+  - The map, the notifications and the chat all react to the sliders.
+  - It uses the real model read-only; nothing is saved (a test checks this).
+- **Notifications** pop up when the forecast, your outage risk, the repair estimate or the number of nearby predicted outages changes. Real outage events also arrive over SSE. A bell keeps the history, and desktop alerts are optional.
+
 ## Frontend: forecast-driven 2D/3D map + chat
 
-The map is on the left and the chat on the right. Everything on the map is the **outage model's prediction for one day of the live weather forecast** (Open-Meteo, from today through 6 days out). A labeled **"What if a storm like Feb 2025 hit?"** toggle replays a historical-size storm, so you can see the map turn red on a calm week.
+The map is on the left and the chat on the right. Everything on the map is the **outage model's prediction for one day of the live weather forecast** (Open-Meteo, from today through 6 days out). Use the **Sandbox** to see the map under a storm on a calm week.
 
 | Control | What it does |
 |---|---|
 | **2D / 3D** | 2D: flat homes, equipment and lines. 3D: generic low-poly models (built in code, no model files) |
 | **Forecast day slider** | Today … +6 days; each day's peak gust and conditions set the storm size the model uses |
-| **Feb 2025 replay** | A hypothetical storm the size of the February 2025 event (1,254 damage reports) |
 | **Layers** | Homes · poles, equipment & lines · trees · your supply path |
 
 Colors run from **green (good) to red (bad)**:

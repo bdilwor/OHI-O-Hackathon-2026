@@ -221,3 +221,15 @@ Replaced parts count removal + install hours; new connectors count install only.
 - **"What could change this":** deterministic and taken from tool results.
   - **Outage chance:** the forecast driver, the top model factor, and local damage history.
   - **Repair time:** the bottleneck device, crew count and arrival, and fallen trees or blocked roads.
+
+## Sandbox (demo/testing only, `backend/tools.py: sandbox_storm`)
+- **Intensity 1–5 maps to storm size** (expected area damage reports): 12, 60, 194 (Sep 2024 size), 600, 1,254 (Feb 2025 size).
+- **Duration:** multiplies storm size by `1 + 0.35 × (days − 1)` (capped at 2,000). Crews arrive after `12 h × days`, once the storm passes.
+- **Affected area:** a circle centered on the home. Equipment outside it gets calm-weather risk (storm size 0.5).
+- **Crews:** the repair estimate uses the crews slider.
+- **Read-only:** nothing is written to the database (tested). Audit entries are tagged `sandbox`.
+
+## Map visuals
+- **Yard trees:** placed around real house positions (0–2 per house, 14–24 m away) and in any OSM residential areas. Their exact spots are illustrative. Wooded-area trees follow real OSM polygons.
+- **Windows:** go dark and a red ring pulses when a home's predicted outage chance is 50% or more.
+- **Rain and tree sway:** scale with the forecast gusts, or with the sandbox intensity.
