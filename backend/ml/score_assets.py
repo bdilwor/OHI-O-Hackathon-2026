@@ -59,6 +59,13 @@ def main() -> None:
         print(f"  {level:6s} expected damaged assets {expected:7.1f}  scale x{scale:.2f}  "
               f"max P {out[f'p_{level}'].max():.3f}")
 
+    # Guarantee: a bigger storm never lowers any asset's risk, so a worse forecast never lowers anyone's
+    # outage chance. The current model already behaves this way for every asset; this makes it hold by
+    # construction after any retrain.
+    levels = sorted(bundle["severity_levels"], key=lambda k: bundle["severity_levels"][k]["n_records"])
+    cols = [f"p_{k}" for k in levels]
+    out[cols] = np.maximum.accumulate(out[cols].to_numpy(), axis=1)
+
     rows = rows_by_level["medium"]
     sv = shap_by_feature(bundle, rows, background=rows.sample(2000, random_state=0))
     sv = sv.drop(columns=[c for c in NON_LOCAL_FEATURES if c in sv.columns])

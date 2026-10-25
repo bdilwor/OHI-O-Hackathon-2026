@@ -1,0 +1,169 @@
+117,599 homes with a supply path, 333,010 assets, 35 storms; major: 2024-09-26 (194 reports), 2025-01-06 (46 reports), 2025-02-12 (1254 reports)
+
+=== (1) 'last storm repeats' warned 3.6% of homes that lost power ===
+  reproduced: 395 of 11,057 homes out in Feb 2025 were out in Helene -> recall 3.6% (precision 26.5%, warned 1,489)
+  with 60 m snap cap on labels: recall 3.3%
+  target 2024-09-26 (194 reports): 1,489 homes out (1.3%), 111 circuits
+    lookup 'previous_storm_any_size': warns 88 homes, recall 0.0% [0.0%, 0.0%]
+    lookup 'all_prior_storms': warns 728 homes, recall 0.3% [0.0%, 1.3%]
+  target 2025-01-06 (46 reports): 1,067 homes out (0.9%), 111 circuits
+    lookup 'previous_major_storm': warns 1,489 homes, recall 12.3% [0.2%, 30.5%]
+    lookup 'previous_storm_any_size': warns 0 homes, recall 0.0% [0.0%, 0.0%]
+    lookup 'all_prior_storms': warns 2,490 homes, recall 12.3% [0.2%, 30.5%]
+  target 2025-02-12 (1254 reports): 11,057 homes out (9.4%), 111 circuits
+    lookup 'previous_storm_over_100_reports': warns 1,489 homes, recall 3.6% [1.4%, 6.8%]
+    lookup 'previous_major_storm': warns 1,067 homes, recall 2.1% [0.1%, 4.8%]
+    lookup 'previous_storm_any_size': warns 1,067 homes, recall 2.1% [0.1%, 4.8%]
+    lookup 'all_prior_storms': warns 3,426 homes, recall 7.4% [4.0%, 11.4%]
+
+=== (2) grid structure beats it by half at the same number of warnings ===
+=== (+) model vs lookup at the same number of warnings ===
+  2024-09-26 (194 reports) | budget = lookup 'previous_storm_any_size' (88 warnings, recall 0.0%)
+     path_length: lookup recall 0
+     structure_model_loso: lookup recall 0
+     history_model_loso: lookup recall 0
+     full_model_loso: lookup recall 0
+  2024-09-26 (194 reports) | budget = lookup 'all_prior_storms' (728 warnings, recall 0.3%)
+     path_length            recall   0.3% [0.0%, 1.0%]       x0.87 [0.02, 2.21]  diff -0.0 pts [-1.0, +0.8]  P(not better) 0.51
+     structure_model_loso   recall   0.5% [0.0%, 1.4%]       x1.40 [0.20, 3.20]  diff +0.1 pts [-0.7, +1.2]  P(not better) 0.40
+     history_model_loso     recall   0.2% [0.0%, 0.9%]       x0.60 [0.00, 1.80]  diff -0.1 pts [-1.1, +0.7]  P(not better) 0.67
+     full_model_loso        recall   0.3% [0.0%, 1.1%]       x1.00 [0.00, 2.40]  diff +0.0 pts [-1.0, +1.0]  P(not better) 0.53
+  2024-09-26 (194 reports) ranking quality (ROC-AUC / avg precision / recall in top 5% of homes):
+     path_length            0.633 / 0.018 (base 0.013) / 6.3% [1.8%, 14.0%]
+     structure_model_loso   0.589 / 0.019 (base 0.013) / 13.7% [3.2%, 28.5%]
+     history_model_loso     0.583 / 0.018 (base 0.013) / 10.5% [3.1%, 21.8%]
+     full_model_loso        0.587 / 0.019 (base 0.013) / 11.7% [1.8%, 24.9%]
+  2025-01-06 (46 reports) | budget = lookup 'previous_major_storm' (1,489 warnings, recall 12.3%)
+     path_length            recall  18.3% [0.0%, 47.6%]      x1.49 [0.00, 60.77]  diff +6.0 pts [-29.0, +45.6]  P(not better) 0.36
+     structure_model_loso   recall   6.6% [0.0%, 13.6%]      x0.53 [0.00, 23.00]  diff -5.7 pts [-29.7, +12.4]  P(not better) 0.63
+     structure_model_past   recall   4.2% [0.2%, 12.1%]      x0.34 [0.06, 22.67]  diff -8.1 pts [-27.4, +10.5]  P(not better) 0.75
+     history_model_loso     recall   3.7% [0.2%, 11.9%]      x0.31 [0.02, 22.67]  diff -8.5 pts [-28.5, +10.5]  P(not better) 0.75
+     history_model_past     recall   3.5% [0.0%, 11.7%]      x0.28 [0.00, 22.67]  diff -8.8 pts [-29.2, +10.5]  P(not better) 0.75
+     full_model_loso        recall   6.3% [0.0%, 13.4%]      x0.51 [0.00, 22.00]  diff -6.0 pts [-29.7, +12.1]  P(not better) 0.64
+     full_model_past        recall   4.2% [0.2%, 12.1%]      x0.34 [0.06, 22.67]  diff -8.1 pts [-27.4, +10.5]  P(not better) 0.75
+  2025-01-06 (46 reports) | budget = lookup 'previous_storm_any_size' (0 warnings, recall 0.0%)
+     path_length: lookup recall 0
+     structure_model_loso: lookup recall 0
+     structure_model_past: lookup recall 0
+     history_model_loso: lookup recall 0
+     history_model_past: lookup recall 0
+     full_model_loso: lookup recall 0
+     full_model_past: lookup recall 0
+  2025-01-06 (46 reports) | budget = lookup 'all_prior_storms' (2,490 warnings, recall 12.3%)
+     path_length            recall  22.8% [0.2%, 54.1%]      x1.86 [0.01, 69.93]  diff +10.5 pts [-27.7, +52.2]  P(not better) 0.32
+     structure_model_loso   recall  14.0% [0.0%, 27.0%]      x1.14 [0.00, 52.00]  diff +1.7 pts [-28.1, +25.8]  P(not better) 0.42
+     structure_model_past   recall   9.9% [0.2%, 21.9%]      x0.81 [0.29, 32.67]  diff -2.3 pts [-15.9, +15.5]  P(not better) 0.65
+     history_model_loso     recall   8.8% [0.5%, 19.4%]      x0.72 [0.25, 35.67]  diff -3.5 pts [-21.1, +16.1]  P(not better) 0.60
+     history_model_past     recall   7.8% [0.2%, 19.1%]      x0.63 [0.25, 32.67]  diff -4.5 pts [-21.5, +15.5]  P(not better) 0.71
+     full_model_loso        recall  14.3% [0.0%, 27.2%]      x1.17 [0.00, 52.00]  diff +2.1 pts [-27.7, +26.1]  P(not better) 0.42
+     full_model_past        recall  11.3% [0.2%, 23.4%]      x0.92 [0.29, 33.67]  diff -0.9 pts [-13.1, +15.7]  P(not better) 0.58
+  2025-01-06 (46 reports) ranking quality (ROC-AUC / avg precision / recall in top 5% of homes):
+     path_length            0.774 / 0.063 (base 0.009) / 30.8% [1.6%, 62.6%]
+     structure_model_loso   0.816 / 0.047 (base 0.009) / 40.0% [18.3%, 58.8%]
+     structure_model_past   0.751 / 0.025 (base 0.009) / 18.5% [6.8%, 29.8%]
+     history_model_loso     0.742 / 0.025 (base 0.009) / 19.7% [7.4%, 30.0%]
+     history_model_past     0.711 / 0.021 (base 0.009) / 16.6% [4.4%, 27.2%]
+     full_model_loso        0.813 / 0.046 (base 0.009) / 38.5% [16.3%, 57.3%]
+     full_model_past        0.759 / 0.026 (base 0.009) / 18.6% [7.0%, 29.8%]
+  2025-02-12 (1254 reports) | budget = lookup 'previous_storm_over_100_reports' (1,489 warnings, recall 3.6%)
+     path_length            recall   5.1% [0.5%, 11.8%]      x1.42 [0.13, 5.02]  diff +1.5 pts [-5.2, +8.8]  P(not better) 0.39
+     structure_model_loso   recall   3.4% [1.4%, 5.8%]       x0.96 [0.34, 2.61]  diff -0.1 pts [-3.9, +2.9]  P(not better) 0.53
+     structure_model_past   recall   3.4% [1.4%, 5.8%]       x0.95 [0.35, 2.63]  diff -0.2 pts [-3.9, +2.9]  P(not better) 0.54
+     history_model_loso     recall   0.9% [0.3%, 1.6%]       x0.25 [0.08, 0.71]  diff -2.7 pts [-6.0, -0.5]  P(not better) 1.00
+     history_model_past     recall   0.7% [0.2%, 1.2%]       x0.19 [0.06, 0.55]  diff -2.9 pts [-6.3, -0.7]  P(not better) 1.00
+     full_model_loso        recall   3.1% [1.4%, 5.0%]       x0.86 [0.34, 2.23]  diff -0.5 pts [-4.1, +2.1]  P(not better) 0.62
+     full_model_past        recall   3.2% [1.4%, 5.2%]       x0.88 [0.34, 2.35]  diff -0.4 pts [-4.1, +2.4]  P(not better) 0.61
+  2025-02-12 (1254 reports) | budget = lookup 'previous_major_storm' (1,067 warnings, recall 2.1%)
+     path_length            recall   3.7% [0.3%, 8.7%]       x1.71 [0.31, 7.47]  diff +1.5 pts [-0.8, +4.4]  P(not better) 0.16
+     structure_model_loso   recall   2.0% [0.8%, 3.4%]       x0.92 [0.60, 7.31]  diff -0.2 pts [-1.6, +1.2]  P(not better) 0.56
+     structure_model_past   recall   2.2% [0.9%, 3.9%]       x1.05 [0.68, 9.20]  diff +0.1 pts [-1.2, +1.5]  P(not better) 0.42
+     history_model_loso     recall   0.3% [0.0%, 0.7%]       x0.15 [0.06, 1.00]  diff -1.8 pts [-4.2, +0.0]  P(not better) 0.97
+     history_model_past     recall   0.3% [0.0%, 0.7%]       x0.15 [0.06, 1.00]  diff -1.8 pts [-4.2, +0.0]  P(not better) 0.97
+     full_model_loso        recall   2.6% [1.1%, 4.3%]       x1.22 [0.69, 13.58]  diff +0.5 pts [-1.3, +2.4]  P(not better) 0.31
+     full_model_past        recall   2.5% [1.0%, 4.3%]       x1.17 [0.69, 12.82]  diff +0.4 pts [-1.2, +2.3]  P(not better) 0.34
+  2025-02-12 (1254 reports) | budget = lookup 'previous_storm_any_size' (1,067 warnings, recall 2.1%)
+     path_length            recall   3.7% [0.3%, 8.7%]       x1.71 [0.31, 7.47]  diff +1.5 pts [-0.8, +4.4]  P(not better) 0.16
+     structure_model_loso   recall   2.0% [0.8%, 3.4%]       x0.92 [0.60, 7.31]  diff -0.2 pts [-1.6, +1.2]  P(not better) 0.56
+     structure_model_past   recall   2.2% [0.9%, 3.9%]       x1.05 [0.68, 9.20]  diff +0.1 pts [-1.2, +1.5]  P(not better) 0.42
+     history_model_loso     recall   0.3% [0.0%, 0.7%]       x0.15 [0.06, 1.00]  diff -1.8 pts [-4.2, +0.0]  P(not better) 0.97
+     history_model_past     recall   0.3% [0.0%, 0.7%]       x0.15 [0.06, 1.00]  diff -1.8 pts [-4.2, +0.0]  P(not better) 0.97
+     full_model_loso        recall   2.6% [1.1%, 4.3%]       x1.22 [0.69, 13.58]  diff +0.5 pts [-1.3, +2.4]  P(not better) 0.31
+     full_model_past        recall   2.5% [1.0%, 4.3%]       x1.17 [0.69, 12.82]  diff +0.4 pts [-1.2, +2.3]  P(not better) 0.34
+  2025-02-12 (1254 reports) | budget = lookup 'all_prior_storms' (3,426 warnings, recall 7.4%)
+     path_length            recall  10.4% [2.0%, 21.9%]      x1.39 [0.28, 2.63]  diff +2.9 pts [-6.0, +13.0]  P(not better) 0.34
+     structure_model_loso   recall   7.8% [4.1%, 12.0%]      x1.05 [0.58, 1.66]  diff +0.4 pts [-3.5, +3.8]  P(not better) 0.43
+     structure_model_past   recall   8.1% [4.3%, 12.4%]      x1.09 [0.62, 1.71]  diff +0.7 pts [-3.2, +4.1]  P(not better) 0.37
+     history_model_loso     recall   2.6% [1.3%, 4.2%]       x0.35 [0.19, 0.58]  diff -4.8 pts [-8.2, -2.0]  P(not better) 1.00
+     history_model_past     recall   2.2% [1.1%, 3.5%]       x0.29 [0.16, 0.50]  diff -5.2 pts [-8.7, -2.3]  P(not better) 1.00
+     full_model_loso        recall   7.6% [4.2%, 11.5%]      x1.03 [0.63, 1.58]  diff +0.2 pts [-3.3, +3.2]  P(not better) 0.46
+     full_model_past        recall   7.7% [4.2%, 11.8%]      x1.04 [0.63, 1.60]  diff +0.3 pts [-3.4, +3.3]  P(not better) 0.44
+  2025-02-12 (1254 reports) ranking quality (ROC-AUC / avg precision / recall in top 5% of homes):
+     path_length            0.695 / 0.190 (base 0.094) / 17.0% [6.0%, 31.2%]
+     structure_model_loso   0.696 / 0.175 (base 0.094) / 12.9% [7.5%, 18.8%]
+     structure_model_past   0.705 / 0.183 (base 0.094) / 13.5% [7.9%, 19.5%]
+     history_model_loso     0.578 / 0.109 (base 0.094) / 4.8% [2.3%, 7.9%]
+     history_model_past     0.577 / 0.108 (base 0.094) / 4.4% [2.1%, 7.6%]
+     full_model_loso        0.690 / 0.168 (base 0.094) / 12.0% [7.0%, 17.7%]
+     full_model_past        0.696 / 0.172 (base 0.094) / 12.2% [7.0%, 17.9%]
+  label sensitivity (60 m cap): lookup recall 2.1%; path_length x1.62 [0.30, 6.10], structure_model_loso x0.82 [0.55, 6.04], full_model_loso x1.12 [0.62, 13.88]
+
+=== (3) riskiest 5% of equipment held a third of the damage (unseen storms) ===
+  2024-09-26 (194 reports): 190 damaged assets
+     nearby_past_damage_250m  top-5% recall 4.3% [3.3%, 6.1%]  AUC 0.496
+     circuit_past_damage      top-5% recall 2.7% [0.0%, 8.4%]  AUC 0.557
+     type_rate                top-5% recall 20.4% [13.6%, 27.0%]  AUC 0.721
+     type_rate_x_length       top-5% recall 21.1% [13.6%, 27.8%]  AUC 0.732
+     structure_model_loso     top-5% recall 31.6% [20.2%, 42.4%]  AUC 0.767
+     history_model_loso       top-5% recall 2.9% [0.0%, 8.9%]  AUC 0.556
+     full_model_loso          top-5% recall 30.0% [17.4%, 42.2%]  AUC 0.765
+     lookup 'damaged_in_any_prior_storm': 87 warnings, recall 0.0%; full model at same budget 0.0%
+  2025-01-06 (46 reports): 46 damaged assets
+     nearby_past_damage_250m  top-5% recall 4.5% [0.0%, 11.1%]  AUC 0.500
+     circuit_past_damage      top-5% recall 7.9% [0.0%, 25.2%]  AUC 0.628
+     type_rate                top-5% recall 33.1% [20.6%, 41.6%]  AUC 0.771
+     type_rate_x_length       top-5% recall 32.6% [15.4%, 45.6%]  AUC 0.793
+     structure_model_loso     top-5% recall 39.1% [16.3%, 58.3%]  AUC 0.837
+     structure_model_past     top-5% recall 39.1% [20.6%, 52.8%]  AUC 0.836
+     history_model_loso       top-5% recall 6.4% [0.0%, 20.3%]  AUC 0.583
+     history_model_past       top-5% recall 1.7% [0.0%, 4.3%]  AUC 0.336
+     full_model_loso          top-5% recall 37.0% [14.3%, 56.9%]  AUC 0.841
+     full_model_past          top-5% recall 43.5% [22.6%, 59.2%]  AUC 0.843
+     lookup 'damaged_in_any_prior_storm': 299 warnings, recall 0.0%; full model at same budget 6.5%
+     lookup 'damaged_in_previous_major_storm': 190 warnings, recall 0.0%; full model at same budget 2.2%
+  2025-02-12 (1254 reports): 1169 damaged assets
+     nearby_past_damage_250m  top-5% recall 6.7% [4.1%, 11.5%]  AUC 0.509
+     circuit_past_damage      top-5% recall 18.6% [0.0%, 47.5%]  AUC 0.716
+     type_rate                top-5% recall 26.8% [24.2%, 29.6%]  AUC 0.762
+     type_rate_x_length       top-5% recall 29.4% [25.9%, 32.7%]  AUC 0.763
+     structure_model_loso     top-5% recall 38.2% [33.6%, 41.4%]  AUC 0.799
+     structure_model_past     top-5% recall 38.0% [32.8%, 41.3%]  AUC 0.799
+     history_model_loso       top-5% recall 4.7% [2.1%, 8.2%]  AUC 0.628
+     history_model_past       top-5% recall 4.7% [2.3%, 8.2%]  AUC 0.620
+     full_model_loso          top-5% recall 32.2% [28.4%, 35.8%]  AUC 0.795
+     full_model_past          top-5% recall 32.2% [28.4%, 35.4%]  AUC 0.785
+     lookup 'damaged_in_any_prior_storm': 345 warnings, recall 1.2%; full model at same budget 3.0%
+     lookup 'damaged_in_previous_major_storm': 46 warnings, recall 0.2%; full model at same budget 0.7%
+  32 minor events pooled: 158 damaged assets
+     structure_model_loso     top-5% recall 39.9%  AUC 0.833
+     history_model_loso       top-5% recall 24.1%  AUC 0.766
+     full_model_loso          top-5% recall 37.3%  AUC 0.833
+     nearby_past_damage_250m  top-5% recall 6.3%
+     type_rate                top-5% recall 16.5%
+     type_rate_x_length       top-5% recall 20.3%
+  mean over the 4 folds (as in METRICS.md): full_model_loso 34.1%, structure_model_loso 37.2%, history_model_loso 9.5%, nearby_past_damage_250m 5.5%, type_rate 24.2%, type_rate_x_length 25.8%
+
+=== (4a) repair-duration intervals (P10-P90, nominal 80%) ===
+  minor_events   n= 134 model coverage 41.0% [32.8%, 50.0%]  constant 48.5%  pinball q50 model 23.66 vs constant 23.66  (actual median 38 d, P90 133 d)
+  storm_2024-09  n= 194 model coverage 34.0% [27.3%, 41.2%]  constant 22.7%  pinball q50 model 9.18 vs constant 9.13  (actual median 23 d, P90 25 d)
+  storm_2025-01  n=  46 model coverage 73.9% [60.9%, 87.0%]  constant 84.8%  pinball q50 model 8.28 vs constant 8.28  (actual median 21 d, P90 35 d)
+  storm_2025-02  n=1209 model coverage 52.5% [49.8%, 55.3%]  constant 61.0%  pinball q50 model 11.15 vs constant 11.07  (actual median 1 d, P90 2 d)
+=== (4b) restoration estimator vs. February 2025 ===
+  400 homes; actual median 1 days (P10-P90 [0.0, 2.0]); estimate median P10/P50/P90 hours [1.5, 16.5, 53.5]
+  P10-P90 covers actual (+/-1 day): 96.5% [93.4%, 99.0%]; P50 within a day: 72.2%; constant interval [312.0, 840.0] h covers 0.0%; same interval for every home [1.5, 53.5] h covers 97.8%; Spearman(P50, actual) -0.01 (p=0.80)
+  actual repair days (homes): {0: 193, 1: 129, 2: 47, 3: 22, 4: 4, 5: 2, 80: 2, 142: 1}
+=== (4c) confidence label vs. accuracy (Feb 2025 homes) ===
+  High    6,261 homes / 4 circuits: out 28.5%, mean predicted 8.1%, AUC 0.621, Brier 0.2410 (base-rate 0.2037)
+  Medium 28,406 homes / 21 circuits: out 12.7%, mean predicted 5.9%, AUC 0.728, Brier 0.1110 (base-rate 0.1110)
+  Low    82,932 homes / 85 circuits: out 6.8%, mean predicted 5.3%, AUC 0.644, Brier 0.0631 (base-rate 0.0636)
+
+Wrote /app/analysis/results/quote_check.json in 81s
